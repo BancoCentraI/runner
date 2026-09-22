@@ -1,0 +1,104 @@
+{
+  "general": {
+    "appName": "قالب فلاتر للبدء",
+    "loading": "جاري التحميل...",
+    "retry": "إعادة المحاولة"
+  },
+  "error": {
+    "title": "حدث خطأ"
+  },
+  "update": {
+    "required": "التحديث مطلوب",
+    "message": "يرجى التحديث إلى أحدث إصدار لمتابعة استخدام التطبيق.",
+    "button": "تحديث"
+  },
+  "home": {
+    "title": "الرئيسية",
+    "settings": "الإعدادات"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "appearance": "المظهر",
+    "theme": "السمة",
+    "chooseTheme": "اختر السمة",
+    "themeMode": "وضع السمة",
+    "themeModeSystem": "النظام",
+    "themeModeLight": "فاتح",
+    "themeModeDark": "داكن",
+    "appTheme": "سمة التطبيق",
+    "backgroundAnimation": "الرسوم المتحركة للخلفية",
+    "language": "اللغة",
+    "support": "الدعم",
+    "contactUs": "اتصل بنا",
+    "rateApp": "قيّم التطبيق",
+    "shareApp": "مشاركة التطبيق",
+    "aboutTitle": "حول",
+    "about": "حول",
+    "legalAndPolicies": "القانونية والسياسات",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfService": "شروط الخدمة",
+    "kvkkClarification": "نص توضيح KVKK",
+    "consentDeclaration": "إعلان الموافقة",
+    "acceptableUsePolicy": "سياسة الاستخدام المقبول",
+    "refundPolicy": "سياسة الاسترداد",
+    "copyrightNotice": "إشعار حقوق النشر",
+    "version": "الإصدار"
+  },
+  "onboarding": {
+    "step1Title": "الخطوة 1",
+    "step1Desc": "أضف المحتوى الخاص بك هنا",
+    "step2Title": "مرحباً!",
+    "step2Desc": "يسعدنا وجودك هنا. تم تصميم هذا التطبيق لجعل تجربتك بسيطة وممتعة. دعنا نجهزك في بضع خطوات فقط.",
+    "step3Title": "اختر المظهر",
+    "step3Desc": "اختر لوناً ووضعاً يناسب ذوقك.",
+    "step4Title": "الخطوة 4",
+    "step4Desc": "أضف المحتوى الخاص بك هنا",
+    "step5Title": "الخطوة 5",
+    "step5Desc": "أضف المحتوى الخاص بك هنا"
+  },
+  "language": {
+    "chooseYourLanguage": "اختر لغتك",
+    "selectPreferredLanguage": "اختر لغتك المفضلة",
+    "continueButton": "متابعة"
+  },
+  "theme": {
+    "title": "تخصيص",
+    "preview": "معاينة",
+    "previewHeadline": "اجعله خاصًا بك",
+    "previewBody": "شاهد كيف يبدو مظهرك في التطبيق.",
+    "previewAction": "زر",
+    "sectionColors": "الألوان",
+    "sectionNeutral": "محايد",
+    "pickColor": "اختر لونًا",
+    "hue": "تدرج اللون",
+    "saturation": "التشبع",
+    "brightnessLevel": "السطوع",
+    "apply": "تطبيق",
+    "systemColors": "ألوان النظام",
+    "systemColorsDesc": "استخدام ألوان خلفية الشاشة (أندرويد 12+)",
+    "contrast": "التباين",
+    "contrastStandard": "قياسي",
+    "contrastHigh": "عالٍ",
+    "mode": "الوضع",
+    "presets": "إعدادات جاهزة",
+    "name": {
+      "purple": "بنفسجي",
+      "blue": "أزرق",
+      "green": "أخضر",
+      "orange": "برتقالي",
+      "red": "أحمر",
+      "black": "أسود",
+      "teal": "أزرق مخضر",
+      "indigo": "نيلي",
+      "monochrome": "أحادي اللون",
+      "amoled": "AMOLED",
+      "custom": "مخصص"
+    },
+    "preset": {
+      "minimal": "بسيط",
+      "ocean": "محيط",
+      "sunset": "غروب",
+      "amoled": "AMOLED"
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "general": {
+    "appName": "Flutter Starter-Vorlage",
+    "loading": "Laden...",
+    "retry": "Erneut versuchen"
+  },
+  "error": {
+    "title": "Ein Fehler ist aufgetreten"
+  },
+  "update": {
+    "required": "Update erforderlich",
+    "message": "Bitte aktualisieren Sie auf die neueste Version, um die App weiter nutzen zu können.",
+    "button": "Aktualisieren"
+  },
+  "home": {
+    "title": "Startseite",
+    "settings": "Einstellungen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "appearance": "Erscheinungsbild",
+    "theme": "Design",
+    "chooseTheme": "Design wählen",
+    "themeMode": "Designmodus",
+    "themeModeSystem": "System",
+    "themeModeLight": "Hell",
+    "themeModeDark": "Dunkel",
+    "appTheme": "App-Design",
+    "backgroundAnimation": "Hintergrundanimation",
+    "language": "Sprache",
+    "support": "Support",
+    "contactUs": "Kontakt",
+    "rateApp": "App bewerten",
+    "shareApp": "App teilen",
+    "aboutTitle": "Über",
+    "about": "Über",
+    "legalAndPolicies": "Rechtliches & Richtlinien",
+    "privacyPolicy": "Datenschutzrichtlinie",
+    "termsOfService": "Nutzungsbedingungen",
+    "kvkkClarification": "KVKK-Aufklärungstext",
+    "consentDeclaration": "Einwilligungserklärung",
+    "acceptableUsePolicy": "Richtlinie zur akzeptablen Nutzung",
+    "refundPolicy": "Rückerstattungsrichtlinie",
+    "copyrightNotice": "Urheberrechtshinweis",
+    "version": "Version"
+  },
+  "onboarding": {
+    "step1Title": "Schritt 1",
+    "step1Desc": "Fügen Sie hier Ihren Inhalt hinzu",
+    "step2Title": "Willkommen!",
+    "step2Desc": "Wir freuen uns, dass Sie hier sind. Diese App wurde entwickelt, um Ihr Erlebnis einfach und angenehm zu gestalten. Lassen Sie uns Sie in wenigen Schritten einrichten.",
+    "step3Title": "Wählen Sie Ihr Design",
+    "step3Desc": "Wählen Sie eine Farbe und einen Modus, der zu Ihrem Stil passt.",
+    "step4Title": "Schritt 4",
+    "step4Desc": "Fügen Sie hier Ihren Inhalt hinzu",
+    "step5Title": "Schritt 5",
+    "step5Desc": "Fügen Sie hier Ihren Inhalt hinzu"
+  },
+  "language": {
+    "chooseYourLanguage": "Wählen Sie Ihre Sprache",
+    "selectPreferredLanguage": "Wählen Sie Ihre bevorzugte Sprache",
+    "continueButton": "Weiter"
+  },
+  "theme": {
+    "title": "Personalisieren",
+    "preview": "Vorschau",
+    "previewHeadline": "Mach es zu deinem",
+    "previewBody": "Sieh, wie dein Theme in der App aussieht.",
+    "previewAction": "Schaltfläche",
+    "sectionColors": "Farben",
+    "sectionNeutral": "Neutral",
+    "pickColor": "Farbe wählen",
+    "hue": "Farbton",
+    "saturation": "Sättigung",
+    "brightnessLevel": "Helligkeit",
+    "apply": "Anwenden",
+    "systemColors": "Systemfarben",
+    "systemColorsDesc": "Farben vom Hintergrundbild verwenden (Android 12+)",
+    "contrast": "Kontrast",
+    "contrastStandard": "Standard",
+    "contrastHigh": "Hoch",
+    "mode": "Modus",
+    "presets": "Voreinstellungen",
+    "name": {
+      "purple": "Lila",
+      "blue": "Blau",
+      "green": "Grün",
+      "orange": "Orange",
+      "red": "Rot",
+      "black": "Schwarz",
+      "teal": "Türkis",
+      "indigo": "Indigo",
+      "monochrome": "Monochrom",
+      "amoled": "AMOLED",
+      "custom": "Eigene"
+    },
+    "preset": {
+      "minimal": "Minimal",
+      "ocean": "Ozean",
+      "sunset": "Sonnenuntergang",
+      "amoled": "AMOLED"
+    }
+  }
+}
