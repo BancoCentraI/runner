@@ -1,0 +1,18 @@
+# flutter_launcher_icons:
+#   android: "launcher_icon"
+#   ios: true
+#   image_path: "assets/app_icon/map2game_full.png"
+#   remove_alpha_ios: true
+#   background_color_ios: "#FFFFFF"
+#   min_sdk_android: 21
+#   adaptive_icon_background: "#FFFFFF"
+#   adaptive_icon_foreground: "assets/app_icon/map2game_full.png"
+#   adaptive_icon_foreground_inset: 0
+
+#   web:
+#     generate: false
+#   windows:
+#     generate: false
+#   macos:
+#     generate: false
+

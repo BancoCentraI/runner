@@ -1,0 +1,39 @@
+# Codegen kapsami — her builder yalnizca ilgilendigi dosyalari tarar.
+# Bu dosya olmadan build_runner lib/ altindaki her .dart dosyasini her builder
+# icin okur; template'te ilk `build_runner build` suresi katlanarak artar.
+#
+# Yeni bir builder eklenirse burada da kapsami daraltilmali.
+targets:
+  $default:
+    builders:
+      # Freezed — yalnizca state ve model dosyalari @freezed tasir.
+      freezed:freezed:
+        generate_for:
+          - lib/**/*_state.dart
+          - lib/**/*_model.dart
+          - lib/**/*_cubit.dart
+
+      json_serializable:json_serializable:
+        generate_for:
+          - lib/**/*_model.dart
+        options:
+          # Modeller Firestore/Hive'a dogrudan Map olarak yazilir, jsonEncode
+          # calismaz. Bu bayrak olmadan ic ice model ham Dart nesnesi olarak
+          # gomulur ve yazma "Invalid argument" ile duser.
+          explicit_to_json: true
+
+      # Typed route'lar tek dosyada tanimli.
+      go_router_builder:go_router_builder:
+        generate_for:
+          - lib/product/navigation/app_router.dart
+
+      # Hive adapter listesi tek @GenerateAdapters bildiriminden uretilir.
+      hive_ce_generator:hive_adapters_generator:
+        generate_for:
+          - lib/product/cache/hive_v2/hive_adapters.dart
+
+      # @HiveType tasiyan modeller yalnizca model klasorlerinde bulunur.
+      hive_ce_generator:hive_type_adapter_generator:
+        generate_for:
+          - lib/product/cache/hive_v2/model/*.dart
+          - lib/product/model/*.dart

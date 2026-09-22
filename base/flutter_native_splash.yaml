@@ -1,0 +1,17 @@
+# flutter_native_splash:
+#   color: "#212121"
+
+#   branding: assets/image/app_ic/app_native_splashimage.png
+#   branding_mode: bottom
+#   branding_bottom_padding: 60
+
+#   android: true
+#   ios: false
+#   web: false
+#   fullscreen: true
+
+#   android_12:
+#     color: "#212121"
+#     image: assets/image/app_ic/boskutucukappicon.png
+#     icon_background_color: "#212121"
+#     branding: assets/image/app_ic/app_native_splashimage.png
