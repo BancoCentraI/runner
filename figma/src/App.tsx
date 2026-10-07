@@ -1018,10 +1018,170 @@ function RoutesScreen({
   );
 }
 
+function LiveLocationScreen({ onClose }: { onClose: () => void }) {
+  const [sharing, setSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [contacts, setContacts] = useState({ marina: true, rafael: true });
+
+  function copyLink() {
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <div className="absolute inset-0 z-[60] bg-[#f7f9f7] screen-enter">
+      <div className="h-full overflow-y-auto pb-6 scrollbar-hide">
+        <header className="sticky top-0 z-20 flex items-center border-b border-[#e4e8e4] bg-[#f7f9f7]/95 px-5 py-4 backdrop-blur-xl">
+          <button
+            aria-label="Voltar ao treino"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[#dce1dc] bg-white"
+            onClick={onClose}
+          >
+            <Icon name="arrow" size={20} />
+          </button>
+          <div className="flex-1 pr-11 text-center">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#858b87]">Segurança durante o treino</p>
+            <h1 className="text-[17px] font-extrabold">Localização em tempo real</h1>
+          </div>
+        </header>
+
+        <main className="space-y-5 px-5 py-5">
+          <section className="relative h-[280px] overflow-hidden rounded-[28px] bg-[#dfe5df]">
+            <div
+              className="absolute inset-0 opacity-70"
+              style={{
+                backgroundImage:
+                  "linear-gradient(25deg, transparent 46%, #fff 47%, #fff 51%, transparent 52%), linear-gradient(115deg, transparent 43%, #fff 44%, #fff 48%, transparent 49%)",
+                backgroundSize: "68px 76px",
+              }}
+            />
+            <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 280" fill="none">
+              <path d="M-20 235 65 191l47 17 76-115 69 45 55-59 111 38" stroke="#171b19" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M-20 235 65 191l47 17 76-115 69 45" stroke="#c6ff32" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="257" cy="138" r="23" fill="#c6ff32" opacity=".25" />
+              <circle cx="257" cy="138" r="12" fill="#171b19" stroke="#c6ff32" strokeWidth="5" />
+            </svg>
+            <div className="absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 shadow-lg">
+              <span className={`h-2.5 w-2.5 rounded-full ${sharing ? "animate-pulse bg-[#3ba55c]" : "bg-[#9da29e]"}`} />
+              <span className="text-[10px] font-extrabold">{sharing ? "Compartilhando ao vivo" : "Compartilhamento pausado"}</span>
+            </div>
+            <button className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-xl bg-white shadow-lg">
+              <Icon name="target" size={19} />
+            </button>
+            <div className="absolute bottom-3 left-3 right-3 rounded-2xl bg-[#171b19] p-3 text-white shadow-xl">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-white/45">Localização atual</p>
+              <p className="mt-1 text-xs font-extrabold">Av. Mariana Amália · Vitória de Santo Antão</p>
+              <p className="mt-0.5 text-[10px] font-medium text-white/45">Atualizada agora · precisão de 8 m</p>
+            </div>
+          </section>
+
+          {!sharing ? (
+            <section className="rounded-[24px] border border-[#e1e5e1] bg-white p-5">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#efffc6] text-[#273800]">
+                  <Icon name="shield" size={21} />
+                </span>
+                <div>
+                  <h2 className="text-[17px] font-extrabold">Corra com mais segurança</h2>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-[#747a76]">
+                    Seus contatos poderão acompanhar seu trajeto até você encerrar o treino.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#171b19] py-4 text-sm font-extrabold text-white"
+                onClick={() => setSharing(true)}
+              >
+                <Icon name="send" size={17} />
+                Compartilhar localização
+              </button>
+            </section>
+          ) : (
+            <section className="rounded-[24px] bg-[#c6ff32] p-5 text-[#172000] screen-up">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-full bg-[#172000] text-[#c6ff32]">
+                  <Icon name="check" size={22} strokeWidth={2.5} />
+                </span>
+                <div>
+                  <h2 className="text-[17px] font-extrabold">Localização compartilhada</h2>
+                  <p className="mt-0.5 text-xs font-bold opacity-60">2 pessoas estão acompanhando você</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 divide-x divide-[#172000]/15 rounded-2xl bg-white/45 p-3 text-center">
+                <div><strong className="block text-sm">Agora</strong><span className="text-[9px] font-bold opacity-55">atualização</span></div>
+                <div><strong className="block text-sm">8 m</strong><span className="text-[9px] font-bold opacity-55">precisão</span></div>
+                <div><strong className="block text-sm">2</strong><span className="text-[9px] font-bold opacity-55">visualizando</span></div>
+              </div>
+            </section>
+          )}
+
+          <section>
+            <div className="mb-3">
+              <p className="eyebrow">Compartilhar com</p>
+              <h2 className="mt-1 section-title">Contatos de confiança</h2>
+            </div>
+            <div className="divide-y divide-[#edf0ed] overflow-hidden rounded-[22px] border border-[#e1e5e1] bg-white">
+              {[
+                { key: "marina" as const, initials: "MS", name: "Marina Silva", relation: "Contato de emergência" },
+                { key: "rafael" as const, initials: "RM", name: "Rafael Martins", relation: "Seu treinador" },
+              ].map((contact) => (
+                <button
+                  className="flex w-full items-center gap-3 p-4 text-left"
+                  key={contact.key}
+                  onClick={() => setContacts((current) => ({ ...current, [contact.key]: !current[contact.key] }))}
+                >
+                  <span className="grid h-11 w-11 place-items-center rounded-full bg-[#171b19] text-xs font-extrabold text-white">{contact.initials}</span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-extrabold">{contact.name}</span>
+                    <span className="block text-[10px] font-medium text-[#858b87]">{contact.relation}</span>
+                  </span>
+                  <span className={`grid h-6 w-6 place-items-center rounded-full border-2 ${
+                    contacts[contact.key] ? "border-[#171b19] bg-[#c6ff32] text-[#172000]" : "border-[#cdd2cd]"
+                  }`}>
+                    {contacts[contact.key] && <Icon name="check" size={13} strokeWidth={2.7} />}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[22px] border border-[#e1e5e1] bg-white p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#858b87]">Link de acompanhamento</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate rounded-xl bg-[#f0f3f0] px-3 py-3 text-xs font-bold text-[#5e645f]">
+                runner.app/live/jose-anderson
+              </span>
+              <button
+                className={`rounded-xl px-4 py-3 text-xs font-extrabold transition ${copied ? "bg-[#c6ff32] text-[#172000]" : "bg-[#171b19] text-white"}`}
+                onClick={copyLink}
+              >
+                {copied ? "Copiado" : "Copiar"}
+              </button>
+            </div>
+          </section>
+
+          {sharing && (
+            <button
+              className="w-full rounded-2xl border border-[#f0d1ce] bg-[#fff5f4] py-4 text-sm font-extrabold text-[#c83328]"
+              onClick={() => setSharing(false)}
+            >
+              Parar de compartilhar
+            </button>
+          )}
+          <p className="px-3 text-center text-[10px] font-medium leading-relaxed text-[#969b97]">
+            Sua localização é protegida e deixa de ser compartilhada automaticamente ao encerrar o treino.
+          </p>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function WorkoutScreen({ onClose }: { onClose: () => void }) {
   const [running, setRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [liveLocationOpen, setLiveLocationOpen] = useState(false);
 
   useEffect(() => {
     if (!running) return;
@@ -1070,7 +1230,11 @@ function WorkoutScreen({ onClose }: { onClose: () => void }) {
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#838985]">Treino de hoje</p>
           <h2 className="text-[15px] font-extrabold">Ritmo progressivo</h2>
         </div>
-        <button className="grid h-11 w-11 place-items-center rounded-full border border-[#dde2dd] bg-white">
+        <button
+          aria-label="Compartilhar localização"
+          className="grid h-11 w-11 place-items-center rounded-full border border-[#dde2dd] bg-white"
+          onClick={() => setLiveLocationOpen(true)}
+        >
           <Icon name="route" size={19} />
         </button>
       </header>
@@ -1103,6 +1267,19 @@ function WorkoutScreen({ onClose }: { onClose: () => void }) {
               <p className="text-[10px] text-[#8b918d]">bpm</p>
             </div>
           </div>
+          <button
+            className="mt-3 flex w-full items-center gap-3 rounded-[18px] border border-[#dfe4df] bg-white p-3 text-left transition hover:border-[#c6ff32]"
+            onClick={() => setLiveLocationOpen(true)}
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#efffc6] text-[#273800]">
+              <Icon name="route" size={19} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-xs font-extrabold">Localização em tempo real</span>
+              <span className="block text-[10px] font-medium text-[#858b87]">Compartilhe seu trajeto com quem confia</span>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
         </div>
         <div className="flex items-center justify-center gap-7">
           <button
@@ -1123,6 +1300,7 @@ function WorkoutScreen({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </main>
+      {liveLocationOpen && <LiveLocationScreen onClose={() => setLiveLocationOpen(false)} />}
     </div>
   );
 }
