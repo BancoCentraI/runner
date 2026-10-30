@@ -18,7 +18,7 @@ class _Cores {
   static const vermelho = Color(0xFFEA4335);
   static Color get fundo =>
       _modoEscuro ? const Color(0xFF151111) : const Color(0xFFFFF8F6);
-  static Color get escuro => // texto principal
+  static Color get escuro =>  // texto principal
       _modoEscuro ? const Color(0xFFF3F4F6) : const Color(0xFF1A1A1A);
   static Color get textoSecundario =>
       _modoEscuro ? const Color(0xFFA3A3A3) : const Color(0xFF6B6B6B);
@@ -40,7 +40,8 @@ class _Cores {
       _modoEscuro ? const Color(0xFF262A23) : const Color(0xFF1A1A1A);
 
   /// Superfícies que são brancas no tema claro.
-  static Color get card => _modoEscuro ? const Color(0xFF1C1F1B) : Colors.white;
+  static Color get card =>
+      _modoEscuro ? const Color(0xFF1C1F1B) : Colors.white;
 }
 
 /// Tema atual (claro/escuro), controlado nas Configurações.
@@ -97,8 +98,8 @@ class _EmergenciaApi {
       return ContatoEmergencia.fromJson(pendentes.last);
     }
 
-    final r =
-        await ApiOffline.buscar('/contato-emergencia', cache: _cacheContato);
+    final r = await ApiOffline.buscar('/contato-emergencia',
+        cache: _cacheContato);
     final corpo = r.mapa;
     if (corpo == null) return null;
     final contato = ContatoEmergencia.fromJson(corpo);
@@ -151,8 +152,8 @@ class _EmergenciaApi {
       );
 
   /// POST /alertas-emergencia/{id}/encerrar
-  static Future<void> encerrarAlerta(String id) =>
-      ApiOffline.enviar('POST', '/alertas-emergencia/{{local:$id}}/encerrar');
+  static Future<void> encerrarAlerta(String id) => ApiOffline.enviar(
+      'POST', '/alertas-emergencia/{{local:$id}}/encerrar');
 }
 
 // =============================================================================
@@ -209,8 +210,7 @@ class _Localizacao {
 }
 
 class _Celular {
-  static String _digitos(String numero) =>
-      numero.replaceAll(RegExp(r'[^\d+]'), '');
+  static String _digitos(String numero) => numero.replaceAll(RegExp(r'[^\d+]'), '');
 
   static Future<bool> _abrir(Uri uri,
       {LaunchMode modo = LaunchMode.platformDefault}) async {
@@ -225,8 +225,8 @@ class _Celular {
   static Future<bool> ligar(String numero) =>
       _abrir(Uri(scheme: 'tel', path: _digitos(numero)));
 
-  static Future<bool> sms(String numero, String texto) => _abrir(
-      Uri.parse('sms:${_digitos(numero)}?body=${Uri.encodeComponent(texto)}'));
+  static Future<bool> sms(String numero, String texto) => _abrir(Uri.parse(
+      'sms:${_digitos(numero)}?body=${Uri.encodeComponent(texto)}'));
 
   static Future<bool> whatsapp(String numero, String texto) {
     var d = numero.replaceAll(RegExp(r'\D'), '');
@@ -506,8 +506,7 @@ class _EmergenciaScreenState extends State<EmergenciaScreen>
       case ResultadoEnvio.enviado:
         _aviso('Contato de emergência salvo.');
       case ResultadoEnvio.naFila:
-        _aviso(
-            'Contato salvo no celular. Será enviado quando houver internet.');
+        _aviso('Contato salvo no celular. Será enviado quando houver internet.');
       case ResultadoEnvio.recusado:
         _aviso('O servidor recusou este contato. Confira o telefone.',
             erro: true);
@@ -657,7 +656,8 @@ class _EmergenciaScreenState extends State<EmergenciaScreen>
                           const SizedBox(height: 10),
                           Text(
                             'Precisão do GPS: ~${_posicao!.accuracy.round()} m',
-                            style: TextStyle(fontSize: 12, color: _Cores.verde),
+                            style: TextStyle(
+                                fontSize: 12, color: _Cores.verde),
                           ),
                         ],
                         const SizedBox(height: 36),
@@ -964,8 +964,8 @@ class _CardContato extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration:
-                    BoxDecoration(color: _Cores.cinza, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: _Cores.cinza, shape: BoxShape.circle),
                 child: Icon(
                   vazio ? Icons.person_add_alt_outlined : Icons.person_outline,
                   size: 20,
@@ -1004,7 +1004,8 @@ class _CardContato extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 22, color: _Cores.escuro),
+              Icon(Icons.chevron_right_rounded,
+                  size: 22, color: _Cores.escuro),
             ],
           ),
         ),
@@ -1059,8 +1060,8 @@ class _Folha extends StatelessWidget {
             if (subtitulo != null) ...[
               const SizedBox(height: 4),
               Text(subtitulo!,
-                  style:
-                      TextStyle(fontSize: 13, color: _Cores.textoSecundario)),
+                  style: TextStyle(
+                      fontSize: 13, color: _Cores.textoSecundario)),
             ],
             const SizedBox(height: 12),
             for (final item in itens)

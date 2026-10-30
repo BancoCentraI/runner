@@ -52,7 +52,8 @@ class _Cores {
       modoEscuro ? const Color(0xFF262A23) : const Color(0xFF1A1A1A);
 
   /// Botão claro dentro do card escuro de resumo.
-  Color get botaoResumo => modoEscuro ? const Color(0xFF353A31) : Colors.white;
+  Color get botaoResumo =>
+      modoEscuro ? const Color(0xFF353A31) : Colors.white;
 }
 
 // =============================================================================
@@ -794,7 +795,8 @@ class _NotificacaoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: lida ? c.card : c.destaqueSuave,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: lida ? c.borda : _Cores.destaque, width: 1.5),
+        border: Border.all(
+            color: lida ? c.borda : _Cores.destaque, width: 1.5),
       ),
       child: Material(
         color: Colors.transparent,
@@ -919,8 +921,8 @@ class _EstadoVazio extends StatelessWidget {
               Container(
                 width: 56,
                 height: 56,
-                decoration:
-                    BoxDecoration(color: c.superficie, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: c.superficie, shape: BoxShape.circle),
                 child: const Icon(Icons.notifications_none_rounded,
                     color: _Cores.destaque, size: 28),
               ),
@@ -937,7 +939,8 @@ class _EstadoVazio extends StatelessWidget {
         Text(
           'Quando houver novidades, elas aparecem aqui.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: c.textoSecundario, height: 1.4),
+          style: TextStyle(
+              fontSize: 14, color: c.textoSecundario, height: 1.4),
         ),
       ],
     );

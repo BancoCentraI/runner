@@ -256,9 +256,9 @@ class _HomeApi {
     var km = 0.0;
     final dias = <int>{};
     for (final c in ApiOffline.corridasPendentes()) {
-      final data =
-          DateTime.tryParse('${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
-              ?.toLocal();
+      final data = DateTime.tryParse(
+              '${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
+          ?.toLocal();
       if (data == null || data.isBefore(segunda)) continue;
       km += _toDouble(c['distanciaKm']);
       dias.add(data.weekday);
@@ -284,8 +284,9 @@ class _HomeApi {
         diasConcluidos: novosDias,
         km: kmTotal,
         metaKm: s.metaKm,
-        percentual:
-            s.metaKm > 0 ? (kmTotal / s.metaKm * 100).round() : s.percentual,
+        percentual: s.metaKm > 0
+            ? (kmTotal / s.metaKm * 100).round()
+            : s.percentual,
       ),
     );
   }

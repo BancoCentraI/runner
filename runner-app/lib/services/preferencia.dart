@@ -1,8 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/offline.dart';
+import 'offline.dart';
 
 // =============================================================================
 // PREFERÊNCIAS DO APP
@@ -38,7 +39,6 @@ class Preferencias extends ChangeNotifier {
     }
     return _tema == ThemeMode.dark;
   }
-
   UnidadeDistancia get unidade => _unidade;
   bool get lembretesTreino => _lembretesTreino;
   bool get mensagensTreinador => _mensagensTreinador;

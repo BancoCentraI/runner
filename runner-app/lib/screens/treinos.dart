@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../services/offline.dart';
 import 'corrida.dart';
+import 'painel.dart';
 import '../services/preferencia.dart';
 
 // =============================================================================
@@ -15,7 +16,7 @@ class _Cores {
   // Cores que são iguais nos dois temas
   static const tinta = Color(0xFF1A1A1A); // texto/ícone sobre verde-limão
   static const destaque = Color(0xFFD0FD38);
-  static Color get escuro => // texto principal
+  static Color get escuro =>  // texto principal
       _modoEscuro ? const Color(0xFFF3F4F6) : const Color(0xFF1A1A1A);
   static Color get destaqueClaro =>
       _modoEscuro ? const Color(0xFF2E3A12) : const Color(0xFFEEF9C9);
@@ -35,7 +36,8 @@ class _Cores {
       _modoEscuro ? const Color(0xFF262A23) : const Color(0xFF1A1A1A);
 
   /// Superfícies que são brancas no tema claro.
-  static Color get card => _modoEscuro ? const Color(0xFF1C1F1B) : Colors.white;
+  static Color get card =>
+      _modoEscuro ? const Color(0xFF1C1F1B) : Colors.white;
 }
 
 /// Tema atual (claro/escuro), controlado nas Configurações.
@@ -60,27 +62,11 @@ String? _toStr(Object? v) {
 
 const _letrasDia = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 const _nomesDia = [
-  'Segunda',
-  'Terça',
-  'Quarta',
-  'Quinta',
-  'Sexta',
-  'Sábado',
-  'Domingo',
+  'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo',
 ];
 const _meses = [
-  'jan',
-  'fev',
-  'mar',
-  'abr',
-  'mai',
-  'jun',
-  'jul',
-  'ago',
-  'set',
-  'out',
-  'nov',
-  'dez',
+  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+  'jul', 'ago', 'set', 'out', 'nov', 'dez',
 ];
 
 bool _mesmoDia(DateTime a, DateTime b) =>
@@ -92,8 +78,9 @@ DateTime _soData(DateTime d) => DateTime(d.year, d.month, d.day);
 String _distancia(double km, {bool comSigla = true}) {
   final milhas = Preferencias.instancia.unidade == UnidadeDistancia.milhas;
   final v = milhas ? km / 1.609344 : km;
-  final t =
-      v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  final t = v == v.truncateToDouble()
+      ? v.toStringAsFixed(0)
+      : v.toStringAsFixed(1);
   final n = t.replaceAll('.', ',');
   return comSigla ? '$n ${milhas ? 'mi' : 'km'}' : n;
 }
@@ -202,10 +189,8 @@ const _predefinidos = <_Nivel, List<TreinoPredefinido>>{
       icone: Icons.shuffle_rounded,
       etapas: [
         _Etapa('Trote leve para aquecer', 10),
-        _Etapa(
-            'Acelere até um poste/árvore e volte ao trote; repita '
-            'quando quiser',
-            20),
+        _Etapa('Acelere até um poste/árvore e volte ao trote; repita '
+            'quando quiser', 20),
         _Etapa('Trote bem leve para desacelerar', 5),
       ],
     ),
@@ -317,9 +302,9 @@ class _TreinosApi {
         DateTime(hoje.year, hoje.month, hoje.day - (hoje.weekday - 1));
     var km = 0.0;
     for (final c in ApiOffline.corridasPendentes()) {
-      final data =
-          DateTime.tryParse('${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
-              ?.toLocal();
+      final data = DateTime.tryParse(
+              '${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
+          ?.toLocal();
       if (data == null || data.isBefore(segunda)) continue;
       km += _toDouble(c['distanciaKm']);
     }
@@ -362,6 +347,27 @@ class _TreinosScreenState extends State<TreinosScreen> {
     Preferencias.instancia.addListener(_atualizar);
     Sincronizador.instancia.enviados.addListener(_carregar);
     _carregar();
+    _lerPapel();
+  }
+
+  /// Treinador ou aluno? Vem do perfil salvo (só muda o texto do botão;
+  /// quem decide o que aparece no painel é a API).
+  bool _ehTreinador = false;
+
+  Future<void> _lerPapel() async {
+    final perfil = await CacheLocal.ler('perfil');
+    final dados = perfil?.dados;
+    if (!mounted || dados is! Map) return;
+    setState(() => _ehTreinador = dados['ehTreinador'] == true);
+  }
+
+  Future<void> _abrirPainel() async {
+    HapticFeedback.selectionClick();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PainelScreen()),
+    );
+    if (mounted) _carregar();
   }
 
   @override
@@ -431,9 +437,10 @@ class _TreinosScreenState extends State<TreinosScreen> {
     );
   }
 
-  List<TreinoAgendado> get _treinosDoDia =>
-      _dados.agenda.where((t) => _mesmoDia(t.data, _diaSelecionado)).toList()
-        ..sort((a, b) => a.data.compareTo(b.data));
+  List<TreinoAgendado> get _treinosDoDia => _dados.agenda
+      .where((t) => _mesmoDia(t.data, _diaSelecionado))
+      .toList()
+    ..sort((a, b) => a.data.compareTo(b.data));
 
   @override
   Widget build(BuildContext context) {
@@ -478,7 +485,11 @@ class _TreinosScreenState extends State<TreinosScreen> {
                     style: TextStyle(
                         fontSize: 14.5, color: _Cores.textoSecundario)),
               ],
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // ---------------- Painel (aluno / treinador) ----------------
+              _BotaoPainel(treinador: _ehTreinador, onTap: _abrirPainel),
+              const SizedBox(height: 16),
 
               // ---------------- Objetivo semanal ----------------
               if (_carregando)
@@ -506,8 +517,8 @@ class _TreinosScreenState extends State<TreinosScreen> {
                   )),
               const SizedBox(height: 4),
               Text('Escolha seu nível e comece quando quiser.',
-                  style:
-                      TextStyle(fontSize: 13, color: _Cores.textoSecundario)),
+                  style: TextStyle(
+                      fontSize: 13, color: _Cores.textoSecundario)),
               const SizedBox(height: 14),
               _SeletorNivel(
                 nivel: _nivel,
@@ -556,14 +567,14 @@ class _TreinosScreenState extends State<TreinosScreen> {
                     message: 'Voltar para hoje',
                     child: Material(
                       color: _Cores.card,
-                      shape:
-                          CircleBorder(side: BorderSide(color: _Cores.borda)),
+                      shape: CircleBorder(
+                          side: BorderSide(color: _Cores.borda)),
                       child: InkWell(
                         customBorder: const CircleBorder(),
                         onTap: () {
                           HapticFeedback.selectionClick();
-                          setState(
-                              () => _diaSelecionado = _soData(DateTime.now()));
+                          setState(() =>
+                              _diaSelecionado = _soData(DateTime.now()));
                         },
                         child: SizedBox(
                           width: 40,
@@ -1093,8 +1104,7 @@ class _FolhaPredefinido extends StatelessWidget {
                         [
                           '${t.minutos} min',
                           t.resumo,
-                          if (t.metaKm != null)
-                            'meta de ${_distancia(t.metaKm!)}',
+                          if (t.metaKm != null) 'meta de ${_distancia(t.metaKm!)}',
                         ].join(' · '),
                         style: TextStyle(
                             fontSize: 13, color: _Cores.textoSecundario),
@@ -1463,8 +1473,9 @@ class _CardAgendado extends StatelessWidget {
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: _Cores.escuro,
-                          decoration:
-                              t.concluido ? TextDecoration.lineThrough : null,
+                          decoration: t.concluido
+                              ? TextDecoration.lineThrough
+                              : null,
                         )),
                     if (detalhes.isNotEmpty) ...[
                       const SizedBox(height: 2),
@@ -1472,7 +1483,8 @@ class _CardAgendado extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 12.5, color: _Cores.textoSecundario)),
+                              fontSize: 12.5,
+                              color: _Cores.textoSecundario)),
                     ],
                   ],
                 ),
@@ -1517,8 +1529,97 @@ class _BlocoCarregando extends StatelessWidget {
         child: SizedBox(
           width: 22,
           height: 22,
-          child:
-              CircularProgressIndicator(strokeWidth: 2.5, color: _Cores.escuro),
+          child: CircularProgressIndicator(
+              strokeWidth: 2.5, color: _Cores.escuro),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// BOTÃO DO PAINEL
+// =============================================================================
+
+class _BotaoPainel extends StatelessWidget {
+  const _BotaoPainel({required this.treinador, required this.onTap});
+
+  final bool treinador;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _Cores.superficie,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: _Cores.destaque,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  treinador
+                      ? Icons.space_dashboard_rounded
+                      : Icons.insights_rounded,
+                  color: _Cores.tinta,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      treinador ? 'ÁREA DO TREINADOR' : 'ÁREA DO ALUNO',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: _Cores.destaque,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      treinador ? 'Painel do treinador' : 'Meu painel de treinos',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      treinador
+                          ? 'Alunos, agenda, desempenho e feedbacks'
+                          : 'Treinos, evolução e feedbacks do treinador',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_forward_rounded,
+                    color: Colors.white, size: 18),
+              ),
+            ],
+          ),
         ),
       ),
     );

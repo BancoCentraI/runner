@@ -56,7 +56,8 @@ class _Paleta {
   Color get heroiTexto => escuro ? Colors.white : _tinta;
 
   /// Nível e textos menores no topo.
-  Color get heroiTextoSec => escuro ? _textoClaro : const Color(0xFF4A5A12);
+  Color get heroiTextoSec =>
+      escuro ? _textoClaro : const Color(0xFF4A5A12);
 
   /// "SUA CONTA", anéis e rota desenhados no fundo.
   Color get heroiLinha => escuro ? _destaque : _tinta;
@@ -253,8 +254,7 @@ class _PerfilApi {
   static Future<PerfilData> buscar() async {
     final r = await ApiOffline.buscar('/perfil', cache: 'perfil');
     final corpo = r.mapa;
-    final dados =
-        corpo != null ? PerfilData.fromJson(corpo) : const PerfilData();
+    final dados = corpo != null ? PerfilData.fromJson(corpo) : const PerfilData();
     return _somarPendentes(dados);
   }
 

@@ -1,3 +1,34 @@
+// =============================================================================
+// MODO OFFLINE DO RUNNER
+// =============================================================================
+//
+// Três peças:
+//
+// 1. CacheLocal  — guarda no aparelho a última resposta boa de cada GET
+//                  (home, treinos, evolução, perfil, contato, notificações).
+//                  Sem internet, as telas mostram esses dados.
+//
+// 2. FilaOffline — tudo que o app ENVIA (corridas, contato, alertas,
+//                  preferências, notificações lidas/excluídas) entra primeiro
+//                  numa fila salva no aparelho. Fechar o app não perde nada.
+//
+// 3. Sincronizador — envia a fila para a API:
+//                  • ao abrir o app e ao voltar para ele;
+//                  • quando a internet volta;
+//                  • a cada 5 minutos;
+//                  • logo depois de cada novo envio.
+//                  Com limite de ritmo (rate limit):
+//                  • no máximo 1 rodada a cada 20 s (3 s se o usuário pediu);
+//                  • no máximo 15 requisições por rodada, 300 ms entre elas;
+//                  • cada item que falha espera 30 s, 1 min, 2 min... até 30 min;
+//                  • se a API responder 429, pausa tudo pelo Retry-After.
+//
+// Cada item e cada cache é separado por usuário (uid do Firebase): se outra
+// pessoa entrar no mesmo celular, ela não vê nem envia os dados da anterior.
+//
+// Requer no pubspec.yaml:  connectivity_plus  e  shared_preferences
+//   flutter pub add connectivity_plus
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -9,7 +40,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/api_config.dart';
+import 'api_config.dart';
 
 /// Usuário atual (os dados de cada pessoa ficam separados).
 String _uidAtual() => FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
@@ -342,8 +373,8 @@ class FilaOffline {
       final prefs = await SharedPreferences.getInstance();
       final atual = prefs.getStringList(_chaveFalhas) ?? [];
       atual.add(json.encode({...item.toJson(), 'erroFinal': erro}));
-      await prefs.setStringList(_chaveFalhas,
-          atual.length > 50 ? atual.sublist(atual.length - 50) : atual);
+      await prefs.setStringList(
+          _chaveFalhas, atual.length > 50 ? atual.sublist(atual.length - 50) : atual);
     } catch (_) {}
     await _salvar();
     debugPrint('[FILA] Descartado ${item.metodo} ${item.caminho}: $erro');
@@ -469,9 +500,7 @@ class Sincronizador with WidgetsBindingObserver {
     );
     await sincronizar(imediato: true);
     return _resultados.remove(item.id) ??
-        (_fila.contem(item.id)
-            ? ResultadoEnvio.naFila
-            : ResultadoEnvio.enviado);
+        (_fila.contem(item.id) ? ResultadoEnvio.naFila : ResultadoEnvio.enviado);
   }
 
   /// Envia o que estiver pronto na fila, respeitando os limites.
@@ -566,13 +595,9 @@ class Sincronizador with WidgetsBindingObserver {
         case 'PUT':
           r = await http.put(uri, headers: cab, body: corpo).timeout(_timeout);
         case 'PATCH':
-          r = await http
-              .patch(uri, headers: cab, body: corpo)
-              .timeout(_timeout);
+          r = await http.patch(uri, headers: cab, body: corpo).timeout(_timeout);
         case 'DELETE':
-          r = await http
-              .delete(uri, headers: cab, body: corpo)
-              .timeout(_timeout);
+          r = await http.delete(uri, headers: cab, body: corpo).timeout(_timeout);
         default:
           await _fila._descartar(item, 'método ${item.metodo} desconhecido');
           _resultados[item.id] = ResultadoEnvio.recusado;
@@ -691,8 +716,7 @@ class ApiOffline {
     debugPrint('[API] GET $caminho falhou: $erro');
 
     final salvo = await CacheLocal.ler(cache);
-    return RespostaApi(
-        dados: salvo?.dados, erro: erro, salvoEm: salvo?.salvoEm);
+    return RespostaApi(dados: salvo?.dados, erro: erro, salvoEm: salvo?.salvoEm);
   }
 
   /// Envio pela fila (POST/PUT/PATCH/DELETE). Nunca perde o dado.

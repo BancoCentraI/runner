@@ -153,7 +153,8 @@ class TreinoFeito {
 
   /// Corpo de um POST /corridas que está na fila offline.
   static TreinoFeito? dePendente(Map<String, dynamic> c) {
-    final data = _toData(c['iniciadoEm'] ?? c['finalizadoEm']);
+    final data =
+        _toData(c['iniciadoEm'] ?? c['finalizadoEm']);
     if (data == null) return null;
     return TreinoFeito(
       titulo: _toStr(c['titulo']) ?? 'Corrida',
@@ -308,9 +309,7 @@ class _EvolucaoApi {
         cache: cache, query: {'semanas': '7'});
     if (r.erro != null) return (null, r.erro);
     final corpo = r.mapa;
-    return corpo != null
-        ? (corpo, null)
-        : (null, 'Resposta inválida do servidor.');
+    return corpo != null ? (corpo, null) : (null, 'Resposta inválida do servidor.');
   }
 }
 
@@ -397,6 +396,7 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
     });
     final (corpo, erro) = await _EvolucaoApi.buscar();
     if (!mounted) return;
+
 
     setState(() {
       _carregando = false;
