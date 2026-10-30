@@ -34,13 +34,12 @@ A navegação principal é composta por:
 
 **Em desenvolvimento.**
 
-##  Equipe
+##  Equipe v2
 
-- **José Anderson** — Wireframe Mobile
-- **Cláudio Gabriel** — Contribuinte do Wireframe *(dispensado)*
+- **José Anderson** — Desenvolvedor Mobile
 - **Felipe Bezerra** — Documentação
 - **Carlos Alberto** — Desenvolvimento da API
-- **Pedro Guilherme** — Wireframe Desktop
+- **Pedro Guilherme** — Wireframe Mobile
 - **Ryan Douglas** — Banco de Dados
 
 > **Corrida — seu percurso, seu desempenho, sua segurança.**
