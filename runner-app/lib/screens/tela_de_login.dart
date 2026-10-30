@@ -43,6 +43,33 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _kWarnColor = Color(0xFFD97706);
   static const _kWarnBgColor = Color(0xFFFFFBEB);
 
+  // Cores que mudam com o tema. Lidas de Theme.of(context), então a tela
+  // se redesenha sozinha quando o usuário troca entre claro e escuro.
+  bool get _escuro => Theme.of(context).brightness == Brightness.dark;
+  Color get _corFundo =>
+      _escuro ? const Color(0xFF111311) : const Color(0xFFF9FAFB);
+  Color get _corTexto => _escuro ? const Color(0xFFF3F4F6) : _kDarkColor;
+  Color get _corSubtexto => _escuro ? const Color(0xFF9CA3AF) : _kSubtextColor;
+  Color get _corBorda => _escuro ? const Color(0xFF2C302A) : _kBorderColor;
+  Color get _corCampo => _escuro ? const Color(0xFF1C1F1B) : Colors.white;
+  Color get _corRotulo =>
+      _escuro ? const Color(0xFFD1D5DB) : const Color(0xFF374151);
+  Color get _corCorpo =>
+      _escuro ? const Color(0xFFB0B5BD) : const Color(0xFF4B5563);
+  Color get _corDica =>
+      _escuro ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF);
+  Color get _corCirculo =>
+      _escuro ? const Color(0xFF2E3A12) : const Color(0xFFE2F1A7);
+  Color get _corErroFundo => _escuro ? const Color(0xFF2A1616) : _kErrorBgColor;
+
+  // Botão principal: escuro no tema claro, verde-limão no tema escuro.
+  Color get _corBotao => _escuro ? _kAccentColor : _kDarkColor;
+  Color get _corTextoBotao => _escuro ? _kDarkColor : Colors.white;
+
+  /// Fundo dos cartões de aviso: no escuro vira um tom translúcido da cor.
+  Color _fundoAviso(Color cor, Color fundoClaro) =>
+      _escuro ? cor.withValues(alpha: 0.12) : fundoClaro;
+
   // Quantas tentativas erradas antes do bloqueio temporário
   static const int _maxTentativas = 5;
 
@@ -58,8 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final ValueNotifier<bool> _carregandoNotifier = ValueNotifier<bool>(false);
 
   // null = sem erro | '' = campo vermelho sem mensagem | texto = campo vermelho + mensagem
-  final ValueNotifier<String?> _emailErroNotifier = ValueNotifier<String?>(null);
-  final ValueNotifier<String?> _senhaErroNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<String?> _emailErroNotifier =
+      ValueNotifier<String?>(null);
+  final ValueNotifier<String?> _senhaErroNotifier =
+      ValueNotifier<String?>(null);
 
   // Contadores que disparam a animação de "balançar"
   final ValueNotifier<int> _emailShakeNotifier = ValueNotifier<int>(0);
@@ -160,7 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!email.contains('@')) return 'Faltou o "@" no e-mail';
 
     final partes = email.split('@');
-    if (partes.length != 2) return 'E-mail inválido. Use algo como nome@email.com';
+    if (partes.length != 2)
+      return 'E-mail inválido. Use algo como nome@email.com';
     if (partes[0].isEmpty) return 'Digite o nome antes do "@"';
 
     final dominio = partes[1];
@@ -168,8 +198,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return 'Faltou o domínio depois do "@" (ex: gmail.com)';
     }
 
-    final regex = RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*\.[a-zA-Z]{2,}$');
-    if (!regex.hasMatch(email)) return 'E-mail inválido. Use algo como nome@email.com';
+    final regex =
+        RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*\.[a-zA-Z]{2,}$');
+    if (!regex.hasMatch(email))
+      return 'E-mail inválido. Use algo como nome@email.com';
     return null;
   }
 
@@ -184,7 +216,8 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _handleLoginEmail() async {
-    if (_segundosRestantesNotifier.value > 0 || _carregandoNotifier.value) return;
+    if (_segundosRestantesNotifier.value > 0 || _carregandoNotifier.value)
+      return;
 
     FocusScope.of(context).unfocus();
     _avisoNotifier.value = null;
@@ -266,7 +299,8 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (_) {}
 
     final texto = e.toString().toLowerCase();
-    if (texto.contains('socketexception') || texto.contains('failed host lookup')) {
+    if (texto.contains('socketexception') ||
+        texto.contains('failed host lookup')) {
       return 'network-request-failed';
     }
 
@@ -299,7 +333,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String _textoTentativas() {
     final restantes = _maxTentativas - _falhas;
     if (restantes <= 0 || restantes > 2) return '';
-    return restantes == 1 ? ' Resta 1 tentativa.' : ' Restam $restantes tentativas.';
+    return restantes == 1
+        ? ' Resta 1 tentativa.'
+        : ' Restam $restantes tentativas.';
   }
 
   /// Registra uma falha de credencial. Retorna true se isso disparou o bloqueio.
@@ -307,7 +343,8 @@ class _LoginScreenState extends State<LoginScreen> {
     _falhas++;
     if (_falhas >= _maxTentativas) {
       _nivelBloqueio++;
-      _bloquear(math.min(30 * _nivelBloqueio, 300)); // 30s, 60s, 90s... máx. 5 min
+      _bloquear(
+          math.min(30 * _nivelBloqueio, 300)); // 30s, 60s, 90s... máx. 5 min
       return true;
     }
     return false;
@@ -343,7 +380,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       case 'user-not-found':
         if (_registrarFalha()) return;
-        _setErroEmail('Não encontramos uma conta com esse e-mail.${_textoTentativas()}');
+        _setErroEmail(
+            'Não encontramos uma conta com esse e-mail.${_textoTentativas()}');
         break;
 
       case 'wrong-password':
@@ -404,7 +442,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _mostrarAviso(const _Aviso(
           icone: Icons.timer_off_outlined,
           titulo: 'Demorou demais',
-          mensagem: 'O servidor não respondeu a tempo. Verifique sua conexão e tente de novo.',
+          mensagem:
+              'O servidor não respondeu a tempo. Verifique sua conexão e tente de novo.',
           cor: _kWarnColor,
           fundo: _kWarnBgColor,
         ));
@@ -414,7 +453,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _mostrarAviso(const _Aviso(
           icone: Icons.block_rounded,
           titulo: 'Conta desativada',
-          mensagem: 'Essa conta está desativada. Fale com o suporte para reativar.',
+          mensagem:
+              'Essa conta está desativada. Fale com o suporte para reativar.',
           cor: _kErrorColor,
           fundo: _kErrorBgColor,
         ));
@@ -424,7 +464,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _mostrarAviso(const _Aviso(
           icone: Icons.alternate_email_rounded,
           titulo: 'Esse e-mail já tem cadastro',
-          mensagem: 'Já existe uma conta com esse e-mail usando outro método de login. '
+          mensagem:
+              'Já existe uma conta com esse e-mail usando outro método de login. '
               'Tente entrar com e-mail e senha.',
           cor: _kWarnColor,
           fundo: _kWarnBgColor,
@@ -453,7 +494,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _mostrarAviso(const _Aviso(
           icone: Icons.error_outline_rounded,
           titulo: 'Algo deu errado',
-          mensagem: 'Não foi possível entrar agora. Tente novamente em instantes.',
+          mensagem:
+              'Não foi possível entrar agora. Tente novamente em instantes.',
           cor: _kErrorColor,
           fundo: _kErrorBgColor,
         ));
@@ -467,7 +509,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: _corFundo,
       body: Stack(
         children: [
           Positioned(
@@ -480,7 +522,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: const Color(0xFFE2F1A7).withValues(alpha: 0.8),
+                    color: _corCirculo.withValues(alpha: 0.8),
                     width: 50,
                   ),
                 ),
@@ -489,7 +531,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -518,21 +561,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Bem-vindo de\nvolta.',
                     style: TextStyle(
                       fontSize: 34,
                       fontWeight: FontWeight.bold,
-                      color: _kDarkColor,
+                      color: _corTexto,
                       height: 1.15,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Entre para acompanhar seus treinos, falar com seu treinador e continuar evoluindo.',
                     style: TextStyle(
                       fontSize: 14,
-                      color: _kSubtextColor,
+                      color: _corSubtexto,
                       height: 1.4,
                     ),
                   ),
@@ -569,10 +612,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ocultarSenha
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
-                              color: _kSubtextColor,
+                              color: _corSubtexto,
                             ),
-                            onPressed: () =>
-                                _ocultarSenhaNotifier.value = !_ocultarSenhaNotifier.value,
+                            onPressed: () => _ocultarSenhaNotifier.value =
+                                !_ocultarSenhaNotifier.value,
                           ),
                         ),
                       );
@@ -587,8 +630,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         builder: (context, lembrarDeMim, child) {
                           return ExcludeFocus(
                             child: InkWell(
-                              onTap: () =>
-                                  _lembrarDeMimNotifier.value = !_lembrarDeMimNotifier.value,
+                              onTap: () => _lembrarDeMimNotifier.value =
+                                  !_lembrarDeMimNotifier.value,
                               borderRadius: BorderRadius.circular(4),
                               child: Row(
                                 children: [
@@ -597,19 +640,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                     height: 24,
                                     child: Checkbox(
                                       value: lembrarDeMim,
-                                      activeColor: _kDarkColor,
+                                      activeColor: _corBotao,
+                                      checkColor: _corTextoBotao,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      side: const BorderSide(color: Color(0xFFD1D5DB)),
-                                      onChanged: (val) =>
-                                          _lembrarDeMimNotifier.value = val ?? false,
+                                      side: BorderSide(
+                                          color: _escuro
+                                              ? const Color(0xFF4B5563)
+                                              : const Color(0xFFD1D5DB)),
+                                      onChanged: (val) => _lembrarDeMimNotifier
+                                          .value = val ?? false,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text(
+                                  Text(
                                     'Lembrar de mim',
-                                    style: TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
+                                    style: TextStyle(
+                                        fontSize: 13, color: _corCorpo),
                                   ),
                                 ],
                               ),
@@ -620,14 +668,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: _irParaEsqueciSenha,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Text(
                             'Esqueci minha senha',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: _kDarkColor,
+                              color: _corTexto,
                               decoration: TextDecoration.underline,
                               decorationColor: _kAccentColor,
                               decorationThickness: 3,
@@ -656,23 +704,26 @@ class _LoginScreenState extends State<LoginScreen> {
                         final bloqueado = segundos > 0;
 
                         return ElevatedButton(
-                          onPressed: (carregando || bloqueado) ? null : _handleLoginEmail,
+                          onPressed: (carregando || bloqueado)
+                              ? null
+                              : _handleLoginEmail,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _kDarkColor,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: _kDarkColor.withValues(alpha: 0.6),
-                            disabledForegroundColor: Colors.white,
+                            backgroundColor: _corBotao,
+                            foregroundColor: _corTextoBotao,
+                            disabledBackgroundColor:
+                                _corBotao.withValues(alpha: 0.6),
+                            disabledForegroundColor: _corTextoBotao,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                           child: carregando
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
-                                    color: Colors.white,
+                                    color: _corTextoBotao,
                                     strokeWidth: 2,
                                   ),
                                 )
@@ -680,7 +731,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      bloqueado ? 'Tente de novo em ${segundos}s' : 'Entrar',
+                                      bloqueado
+                                          ? 'Tente de novo em ${segundos}s'
+                                          : 'Entrar',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
@@ -700,22 +753,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(child: Divider(color: _kBorderColor)),
+                      Expanded(child: Divider(color: _corBorda)),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
                           'OU CONTINUE COM',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: _kSubtextColor,
+                            color: _corSubtexto,
                             letterSpacing: 0.8,
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: _kBorderColor)),
+                      Expanded(child: Divider(color: _corBorda)),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -728,13 +781,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         return OutlinedButton(
                           onPressed: carregando ? null : _handleLoginGoogle,
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: const BorderSide(color: _kBorderColor),
+                            backgroundColor: _corCampo,
+                            side: BorderSide(color: _corBorda),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
@@ -742,16 +795,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: _kDarkColor,
+                                  color: _corTexto,
                                 ),
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Text(
                                 'Entrar com Google',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
-                                  color: _kDarkColor,
+                                  color: _corTexto,
                                 ),
                               ),
                             ],
@@ -768,14 +821,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: RichText(
-                          text: const TextSpan(
+                          text: TextSpan(
                             text: 'Ainda não tem uma conta? ',
-                            style: TextStyle(color: _kSubtextColor, fontSize: 13),
+                            style: TextStyle(color: _corSubtexto, fontSize: 13),
                             children: [
                               TextSpan(
                                 text: 'Criar conta grátis',
                                 style: TextStyle(
-                                  color: _kDarkColor,
+                                  color: _corTexto,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -798,10 +851,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF374151),
+        color: _corRotulo,
       ),
     );
   }
@@ -840,7 +893,8 @@ class _LoginScreenState extends State<LoginScreen> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 child: aviso == null
-                    ? const SizedBox(key: ValueKey('sem-aviso'), width: double.infinity)
+                    ? const SizedBox(
+                        key: ValueKey('sem-aviso'), width: double.infinity)
                     : Padding(
                         key: ValueKey('${aviso.titulo}|${aviso.mensagem}'),
                         padding: const EdgeInsets.only(bottom: 16),
@@ -901,7 +955,7 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: aviso.fundo,
+        color: _fundoAviso(aviso.cor, aviso.fundo),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: aviso.cor.withValues(alpha: 0.25)),
         boxShadow: [
@@ -932,10 +986,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 2),
                 Text(
                   aviso.mensagem,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: Color(0xFF4B5563),
+                    color: _corCorpo,
                   ),
                 ),
                 if (aviso.acao != null && aviso.acaoTexto != null)
@@ -955,7 +1009,7 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _kWarnBgColor,
+        color: _fundoAviso(_kWarnColor, _kWarnBgColor),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _kWarnColor.withValues(alpha: 0.25)),
         boxShadow: [
@@ -990,13 +1044,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(
                       'Por segurança, pausamos novas tentativas. Tente de novo em ${segundos}s. '
                       'Se esqueceu a senha, você pode recuperá-la agora.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         height: 1.35,
-                        color: Color(0xFF4B5563),
+                        color: _corCorpo,
                       ),
                     ),
-                    _buildBotaoAcao('Recuperar minha senha', _kWarnColor, _irParaEsqueciSenha),
+                    _buildBotaoAcao('Recuperar minha senha', _kWarnColor,
+                        _irParaEsqueciSenha),
                   ],
                 ),
               ),
@@ -1040,7 +1095,7 @@ class _LoginScreenState extends State<LoginScreen> {
       valueListenable: erroNotifier,
       builder: (context, erro, _) {
         final temErro = erro != null;
-        final corBorda = temErro ? _kErrorColor : _kBorderColor;
+        final corBorda = temErro ? _kErrorColor : _corBorda;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1054,7 +1109,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   tween: Tween(begin: shakeCount == 0 ? 0.0 : 1.0, end: 0.0),
                   duration: const Duration(milliseconds: 400),
                   builder: (context, valor, child) {
-                    final deslocamento = math.sin(valor * math.pi * 6) * 8 * valor;
+                    final deslocamento =
+                        math.sin(valor * math.pi * 6) * 8 * valor;
                     return Transform.translate(
                       offset: Offset(deslocamento, 0),
                       child: child,
@@ -1071,18 +1127,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 onSubmitted: onSubmitted,
                 decoration: InputDecoration(
                   hintText: hintText,
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  hintStyle: TextStyle(color: _corDica),
                   prefixIcon: Icon(
                     prefixIcon,
-                    color: temErro ? _kErrorColor : _kSubtextColor,
+                    color: temErro ? _kErrorColor : _corSubtexto,
                   ),
                   suffixIcon: suffixIcon,
                   filled: true,
-                  fillColor: temErro ? _kErrorBgColor : Colors.white,
+                  fillColor: temErro ? _corErroFundo : _corCampo,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   border: borda(corBorda),
                   enabledBorder: borda(corBorda, temErro ? 1.5 : 1),
-                  focusedBorder: borda(temErro ? _kErrorColor : _kDarkColor, 1.5),
+                  focusedBorder: borda(temErro ? _kErrorColor : _corTexto, 1.5),
                 ),
               ),
             ),

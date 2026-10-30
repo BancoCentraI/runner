@@ -23,6 +23,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   static const int _segundosReenvio = 60;
 
+  // Cores que mudam com o tema. Lidas de Theme.of(context), então a tela
+  // se redesenha sozinha quando o usuário troca entre claro e escuro.
+  bool get _escuro => Theme.of(context).brightness == Brightness.dark;
+  Color get _corFundo =>
+      _escuro ? const Color(0xFF111311) : const Color(0xFFF9FAFB);
+  Color get _corTexto => _escuro ? const Color(0xFFF3F4F6) : _kDarkColor;
+  Color get _corSubtexto => _escuro ? const Color(0xFF9CA3AF) : _kSubtextColor;
+  Color get _corBorda => _escuro ? const Color(0xFF2C302A) : _kBorderColor;
+  Color get _corCampo => _escuro ? const Color(0xFF1C1F1B) : Colors.white;
+  Color get _corRotulo =>
+      _escuro ? const Color(0xFFD1D5DB) : const Color(0xFF374151);
+  Color get _corCorpo =>
+      _escuro ? const Color(0xFFB0B5BD) : const Color(0xFF4B5563);
+  Color get _corDica =>
+      _escuro ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF);
+  Color get _corErroFundo => _escuro ? const Color(0xFF2A1616) : _kErrorBgColor;
+  Color get _corSucessoFundo =>
+      _escuro ? const Color(0xFF14261C) : const Color(0xFFECFDF5);
+
+  /// Quadrado do ícone no topo (escuro nos dois temas, com borda no escuro).
+  Color get _corLogo => _escuro ? const Color(0xFF262A23) : _kDarkColor;
+
+  // Botão principal: escuro no tema claro, verde-limão no tema escuro.
+  Color get _corBotao => _escuro ? _kAccentColor : _kDarkColor;
+  Color get _corTextoBotao => _escuro ? _kDarkColor : Colors.white;
+
   final _emailController = TextEditingController();
   final RecuperacaoSenhaService _service = RecuperacaoSenhaService();
 
@@ -148,7 +174,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on RecuperacaoSenhaException catch (e) {
       _mostrarSnack(e.mensagem, isError: true);
     } catch (_) {
-      _mostrarSnack('Não foi possível reenviar agora. Tente novamente.', isError: true);
+      _mostrarSnack('Não foi possível reenviar agora. Tente novamente.',
+          isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -180,7 +207,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: _corFundo,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -188,11 +215,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           padding: const EdgeInsets.only(left: 16.0),
           child: IconButton(
             onPressed: _voltarParaLogin,
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _kDarkColor),
+            icon: Icon(Icons.arrow_back_ios_new_rounded,
+                size: 18, color: _corTexto),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: _kBorderColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: _corCampo,
+              side: BorderSide(color: _corBorda),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
@@ -203,8 +232,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _emailEnviado
-                ? KeyedSubtree(key: const ValueKey('ok'), child: _buildTelaSucesso())
-                : KeyedSubtree(key: const ValueKey('form'), child: _buildTelaFormulario()),
+                ? KeyedSubtree(
+                    key: const ValueKey('ok'), child: _buildTelaSucesso())
+                : KeyedSubtree(
+                    key: const ValueKey('form'), child: _buildTelaFormulario()),
           ),
         ),
       ),
@@ -223,29 +254,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
+            color: _corSucessoFundo,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.green.withValues(alpha: 0.3), width: 2),
+            border: Border.all(
+                color: Colors.green.withValues(alpha: 0.3), width: 2),
           ),
-          child: const Icon(Icons.mark_email_read_outlined, color: Colors.green, size: 36),
+          child: const Icon(Icons.mark_email_read_outlined,
+              color: Colors.green, size: 36),
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Confira seu e-mail',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _kDarkColor),
+          style: TextStyle(
+              fontSize: 24, fontWeight: FontWeight.bold, color: _corTexto),
         ),
         const SizedBox(height: 12),
         Text(
           'Se existir uma conta para\n${_emailController.text.trim()}\n'
           'você receberá um link para definir uma nova senha.',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: _kSubtextColor, height: 1.4),
+          style: TextStyle(fontSize: 14, color: _corSubtexto, height: 1.4),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Não chegou? Olhe também a caixa de spam.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12.5, color: _kSubtextColor),
+          style: TextStyle(fontSize: 12.5, color: _corSubtexto),
         ),
         const SizedBox(height: 32),
         SizedBox(
@@ -254,9 +288,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: ElevatedButton(
             onPressed: _voltarParaLogin,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kDarkColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              backgroundColor: _corBotao,
+              foregroundColor: _corTextoBotao,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
             child: const Text('Voltar para o Login',
@@ -266,8 +301,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 12),
         TextButton(
           onPressed: (bloqueado || _isLoading) ? null : _reenviar,
+          style: TextButton.styleFrom(foregroundColor: _corTexto),
           child: Text(
-            bloqueado ? 'Reenviar e-mail em ${_segundosRestantes}s' : 'Reenviar e-mail',
+            bloqueado
+                ? 'Reenviar e-mail em ${_segundosRestantes}s'
+                : 'Reenviar e-mail',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
@@ -277,7 +315,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             _timerReenvio?.cancel();
             _segundosRestantes = 0;
           }),
-          child: const Text('Usar outro e-mail', style: TextStyle(color: _kSubtextColor)),
+          child:
+              Text('Usar outro e-mail', style: TextStyle(color: _corSubtexto)),
         ),
       ],
     );
@@ -286,9 +325,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // Formulário principal de recuperação
   Widget _buildTelaFormulario() {
     final temErroCampo = _erroCampo != null;
-    final corBorda = temErroCampo ? _kErrorColor : _kBorderColor;
+    final corBorda = temErroCampo ? _kErrorColor : _corBorda;
 
-    OutlineInputBorder borda(Color cor, [double largura = 1]) => OutlineInputBorder(
+    OutlineInputBorder borda(Color cor, [double largura = 1]) =>
+        OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: cor, width: largura),
         );
@@ -300,25 +340,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: _kDarkColor,
+            color: _corLogo,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(Icons.lock_reset_rounded, color: _kAccentColor, size: 24),
+          child: const Icon(Icons.lock_reset_rounded,
+              color: _kAccentColor, size: 24),
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Esqueceu sua senha?',
-          style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: _kDarkColor),
+          style: TextStyle(
+              fontSize: 30, fontWeight: FontWeight.bold, color: _corTexto),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Digite seu e-mail abaixo e enviaremos um link para você redefinir sua senha com segurança.',
-          style: TextStyle(fontSize: 14, color: _kSubtextColor, height: 1.4),
+          style: TextStyle(fontSize: 14, color: _corSubtexto, height: 1.4),
         ),
         const SizedBox(height: 32),
-        const Text(
+        Text(
           'E-mail cadastrado',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+          style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600, color: _corRotulo),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -328,17 +371,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onSubmitted: (_) => _enviarInstrucoes(),
           decoration: InputDecoration(
             hintText: 'seu@email.com',
-            hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+            hintStyle: TextStyle(color: _corDica),
             prefixIcon: Icon(
               Icons.email_outlined,
-              color: temErroCampo ? _kErrorColor : _kSubtextColor,
+              color: temErroCampo ? _kErrorColor : _corSubtexto,
             ),
             filled: true,
-            fillColor: temErroCampo ? _kErrorBgColor : Colors.white,
+            fillColor: temErroCampo ? _corErroFundo : _corCampo,
             contentPadding: const EdgeInsets.symmetric(vertical: 16),
             border: borda(corBorda),
             enabledBorder: borda(corBorda, temErroCampo ? 1.5 : 1),
-            focusedBorder: borda(temErroCampo ? _kErrorColor : _kDarkColor, 1.5),
+            focusedBorder: borda(temErroCampo ? _kErrorColor : _corTexto, 1.5),
           ),
         ),
         AnimatedSize(
@@ -353,7 +396,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     children: [
                       const Padding(
                         padding: EdgeInsets.only(top: 1),
-                        child: Icon(Icons.error_outline_rounded, size: 16, color: _kErrorColor),
+                        child: Icon(Icons.error_outline_rounded,
+                            size: 16, color: _kErrorColor),
                       ),
                       const SizedBox(width: 6),
                       Flexible(
@@ -389,18 +433,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: ElevatedButton(
             onPressed: _isLoading ? null : _enviarInstrucoes,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kDarkColor,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: _kDarkColor.withValues(alpha: 0.6),
-              disabledForegroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              backgroundColor: _corBotao,
+              foregroundColor: _corTextoBotao,
+              disabledBackgroundColor: _corBotao.withValues(alpha: 0.6),
+              disabledForegroundColor: _corTextoBotao,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
             child: _isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                        color: _corTextoBotao, strokeWidth: 2),
                   )
                 : const Text(
                     'Enviar instruções',
@@ -418,13 +464,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         erro.tipo == RecuperacaoSenhaErro.tempoEsgotado ||
         erro.tipo == RecuperacaoSenhaErro.muitasTentativas;
     final cor = aviso ? _kWarnColor : _kErrorColor;
-    final fundo = aviso ? _kWarnBgColor : _kErrorBgColor;
+    // No escuro, o fundo do cartão vira um tom translúcido da própria cor.
+    final fundo = _escuro
+        ? cor.withValues(alpha: 0.12)
+        : (aviso ? _kWarnBgColor : _kErrorBgColor);
 
     final (icone, titulo) = switch (erro.tipo) {
-      RecuperacaoSenhaErro.semConexao => (Icons.wifi_off_rounded, 'Sem conexão'),
-      RecuperacaoSenhaErro.tempoEsgotado => (Icons.timer_off_outlined, 'Demorou demais'),
-      RecuperacaoSenhaErro.muitasTentativas => (Icons.shield_outlined, 'Muitos pedidos seguidos'),
-      RecuperacaoSenhaErro.erroInterno => (Icons.cloud_off_rounded, 'Problema no nosso servidor'),
+      RecuperacaoSenhaErro.semConexao => (
+          Icons.wifi_off_rounded,
+          'Sem conexão'
+        ),
+      RecuperacaoSenhaErro.tempoEsgotado => (
+          Icons.timer_off_outlined,
+          'Demorou demais'
+        ),
+      RecuperacaoSenhaErro.muitasTentativas => (
+          Icons.shield_outlined,
+          'Muitos pedidos seguidos'
+        ),
+      RecuperacaoSenhaErro.erroInterno => (
+          Icons.cloud_off_rounded,
+          'Problema no nosso servidor'
+        ),
       _ => (Icons.error_outline_rounded, 'Algo deu errado'),
     };
 
@@ -462,15 +523,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               children: [
                 Text(
                   titulo,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cor),
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: cor),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   erro.mensagem,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: Color(0xFF4B5563),
+                    color: _corCorpo,
                   ),
                 ),
               ],

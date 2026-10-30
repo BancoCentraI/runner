@@ -9,7 +9,8 @@ import 'dart:developer';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  final String _baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://sua-api.com/api';
+  final String _baseUrl =
+      dotenv.env['API_BASE_URL'] ?? 'https://sua-api.com/api';
 
   Future<void> _verificarOuCriarUsuarioNaApi({
     required String uid,
@@ -63,7 +64,7 @@ class AuthService {
         email: email.trim(),
         password: senha,
       );
-      
+
       if (credential.user != null) {
         await _verificarOuCriarUsuarioNaApi(
           uid: credential.user!.uid,
@@ -93,7 +94,8 @@ class AuthService {
       }
 
       // 3. Obtém as credenciais de autenticação (necessário usar await)
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // 4. Cria a credencial para o Firebase
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -101,7 +103,8 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
       final user = userCredential.user;
 
       if (user != null) {
@@ -147,16 +150,18 @@ class AuthService {
   }
 
   // Método para criar conta com Nome, E-mail e Senha
-  Future<User?> cadastrarComEmail(String nome, String email, String senha) async {
+  Future<User?> cadastrarComEmail(
+      String nome, String email, String senha) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: senha,
       );
-      
+
       if (credential.user != null) {
         // Atualiza o nome de exibição no Firebase Auth
         await credential.user!.updateDisplayName(nome.trim());
+        await credential.user!.reload();
 
         // Sincroniza o novo usuário com a sua API backend
         await _verificarOuCriarUsuarioNaApi(

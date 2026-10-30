@@ -1,26 +1,56 @@
-import 'dart:convert';
+import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+import '../services/offline.dart';
+import 'notificacao.dart';
+import 'emergencia.dart';
+import 'corrida.dart';
+import 'rotas.dart';
+import 'perfil.dart';
+import 'evolucao.dart';
+import 'treinos.dart';
+import '../services/preferencia.dart';
 
 // =============================================================================
 // CORES
 // =============================================================================
 
 class _Cores {
-  static const escuro = Color(0xFF1A1A1A);
+  // Cores que são iguais nos dois temas
+  static const tinta = Color(0xFF1A1A1A); // texto/ícone sobre verde-limão
   static const destaque = Color(0xFFD0FD38);
-  static const textoSecundario = Color(0xFF6B7280);
-  static const fundo = Color(0xFFF9FAFB);
-  static const cinzaClaro = Color(0xFFF3F4F6);
-  static const borda = Color(0xFFE5E7EB);
-  static const verde = Color(0xFF386641);
   static const vermelho = Color(0xFFEF4444);
-  static const vermelhoFundo = Color(0xFFFEF2F2);
-  static const vermelhoBorda = Color(0xFFFCA5A5);
-  static const cardTreinador = Color(0xFFE8EDE9);
+  static Color get escuro => // texto principal
+      _modoEscuro ? const Color(0xFFF3F4F6) : const Color(0xFF1A1A1A);
+  static Color get textoSecundario =>
+      _modoEscuro ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+  static Color get fundo =>
+      _modoEscuro ? const Color(0xFF111311) : const Color(0xFFF9FAFB);
+  static Color get cinzaClaro =>
+      _modoEscuro ? const Color(0xFF252923) : const Color(0xFFF3F4F6);
+  static Color get borda =>
+      _modoEscuro ? const Color(0xFF2C302A) : const Color(0xFFE5E7EB);
+  static Color get verde =>
+      _modoEscuro ? const Color(0xFF9BC27A) : const Color(0xFF386641);
+  static Color get vermelhoFundo =>
+      _modoEscuro ? const Color(0xFF2A1616) : const Color(0xFFFEF2F2);
+  static Color get vermelhoBorda =>
+      _modoEscuro ? const Color(0xFF5A2A2A) : const Color(0xFFFCA5A5);
+  static Color get cardTreinador =>
+      _modoEscuro ? const Color(0xFF1E2620) : const Color(0xFFE8EDE9);
+
+  /// Cards e botões que são pretos no tema claro.
+  static Color get superficie =>
+      _modoEscuro ? const Color(0xFF262A23) : const Color(0xFF1A1A1A);
+
+  /// Superfícies que são brancas no tema claro.
+  static Color get card => _modoEscuro ? const Color(0xFF1C1F1B) : Colors.white;
 }
+
+/// Tema atual (claro/escuro), controlado nas Configurações.
+bool get _modoEscuro => Preferencias.instancia.modoEscuro;
 
 // =============================================================================
 // MODELOS (convertem o JSON da API em objetos seguros)
@@ -39,12 +69,21 @@ String? _toStr(Object? v) {
 
 /// 18.4 -> "18,4" | 28.0 -> "28"
 String _formatarKm(double v) {
-  final texto = v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  final texto =
+      v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
   return texto.replaceAll('.', ',');
 }
 
+/// "Maria Silva Santos" -> "Maria" | vazio/nulo -> "Atleta"
+String _primeiroNome(String? nomeCompleto) {
+  final nome = nomeCompleto?.trim() ?? '';
+  if (nome.isEmpty) return 'Atleta';
+  return nome.split(RegExp(r'\s+')).first;
+}
+
 class TreinoHoje {
-  const TreinoHoje({required this.titulo, required this.detalhes, this.imagemUrl});
+  const TreinoHoje(
+      {required this.titulo, required this.detalhes, this.imagemUrl});
 
   final String titulo;
   final String detalhes;
@@ -107,7 +146,8 @@ class ResumoSemana {
 }
 
 class ProximoTreino {
-  const ProximoTreino({required this.dia, this.tipo, required this.nome, required this.resumo});
+  const ProximoTreino(
+      {required this.dia, this.tipo, required this.nome, required this.resumo});
 
   final String dia;
   final String? tipo;
@@ -123,7 +163,8 @@ class ProximoTreino {
 }
 
 class Treinador {
-  const Treinador({required this.nome, required this.status, required this.mensagem});
+  const Treinador(
+      {required this.nome, required this.status, required this.mensagem});
 
   final String nome;
   final String status;
@@ -132,7 +173,8 @@ class Treinador {
   bool get online => status.toUpperCase() == 'ONLINE';
 
   String get iniciais {
-    final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final partes =
+        nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (partes.isEmpty) return '?';
     if (partes.length == 1) return partes.first[0].toUpperCase();
     return (partes.first[0] + partes.last[0]).toUpperCase();
@@ -188,27 +230,64 @@ class HomeData {
 // =============================================================================
 
 class _HomeApi {
-  /// Busca os dados da home. Se a API falhar, devolve tudo vazio (nada é inventado).
-  static Future<HomeData> buscar() async {
-    try {
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://sua-api.com';
-      final response = await http
-          .get(Uri.parse('$baseUrl/home-dados'))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        // utf8.decode evita acentos quebrados (ex.: "EvoluÃ§Ã£o")
-        final corpo = json.decode(utf8.decode(response.bodyBytes));
-        if (corpo is Map<String, dynamic>) {
-          debugPrint('[API] Dados da home carregados com sucesso.');
-          return HomeData.fromJson(corpo);
-        }
-      }
-      debugPrint('[API] Resposta inesperada (${response.statusCode}).');
-    } catch (e) {
-      debugPrint('[API] Erro ao conectar na API: $e');
+  /// GET /home-dados com cache: sem internet, devolve os últimos dados
+  /// salvos no aparelho. Corridas ainda não enviadas já contam na semana.
+  static Future<({HomeData dados, String? erro, DateTime? salvoEm})>
+      buscar() async {
+    final r = await ApiOffline.buscar('/home-dados', cache: 'home');
+    final corpo = r.mapa;
+    if (r.erro == null && corpo == null) {
+      return (
+        dados: _somarPendentes(const HomeData()),
+        erro: 'Resposta inválida do servidor.',
+        salvoEm: null,
+      );
     }
-    return const HomeData();
+    final dados = corpo != null ? HomeData.fromJson(corpo) : const HomeData();
+    return (dados: _somarPendentes(dados), erro: r.erro, salvoEm: r.salvoEm);
+  }
+
+  /// Soma na "Sua semana" as corridas desta semana que estão na fila.
+  static HomeData _somarPendentes(HomeData d) {
+    final hoje = DateTime.now();
+    final segunda =
+        DateTime(hoje.year, hoje.month, hoje.day - (hoje.weekday - 1));
+
+    var km = 0.0;
+    final dias = <int>{};
+    for (final c in ApiOffline.corridasPendentes()) {
+      final data =
+          DateTime.tryParse('${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
+              ?.toLocal();
+      if (data == null || data.isBefore(segunda)) continue;
+      km += _toDouble(c['distanciaKm']);
+      dias.add(data.weekday);
+    }
+    if (dias.isEmpty) return d;
+
+    final s = d.semana;
+    final novosDias = s.diasConcluidos.isNotEmpty
+        ? ({...s.diasConcluidos, ...dias}.toList()..sort())
+        : const <int>[];
+    final kmTotal = s.km + km;
+    return HomeData(
+      nomeUsuario: d.nomeUsuario,
+      temNotificacao: d.temNotificacao,
+      treinoHoje: d.treinoHoje,
+      proximoTreino: d.proximoTreino,
+      treinador: d.treinador,
+      semana: ResumoSemana(
+        diasCompletos: s.diasConcluidos.isNotEmpty
+            ? novosDias.length
+            : s.diasCompletos + dias.length,
+        metaDias: s.metaDias,
+        diasConcluidos: novosDias,
+        km: kmTotal,
+        metaKm: s.metaKm,
+        percentual:
+            s.metaKm > 0 ? (kmTotal / s.metaKm * 100).round() : s.percentual,
+      ),
+    );
   }
 }
 
@@ -228,59 +307,172 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _carregando = true;
   HomeData _dados = const HomeData();
 
+  /// Mensagem de erro da API (null = tudo certo). Aparece como uma bolinha
+  /// vermelha no canto; ao tocar, mostra a mensagem.
+  String? _erroConexao;
+
   @override
   void initState() {
     super.initState();
+    // Quando a fila offline envia algo, recarrega (os números mudam).
+    Sincronizador.instancia.enviados.addListener(_carregar);
+    FilaOffline.instancia.pendentes.addListener(_atualizarAviso);
     _carregar();
   }
 
+  @override
+  void dispose() {
+    Sincronizador.instancia.enviados.removeListener(_carregar);
+    FilaOffline.instancia.pendentes.removeListener(_atualizarAviso);
+    super.dispose();
+  }
+
+  String? _erroApi;
+  DateTime? _salvoEm;
+
   Future<void> _carregar() async {
-    final dados = await _HomeApi.buscar();
+    final r = await _HomeApi.buscar();
     if (!mounted) return; // evita setState com a tela já fechada
     setState(() {
-      _dados = dados;
+      _dados = r.dados;
       _carregando = false;
+      _erroApi = r.erro;
+      _salvoEm = r.salvoEm;
+      _erroConexao = _mensagemAviso();
     });
+  }
+
+  void _atualizarAviso() {
+    if (mounted) setState(() => _erroConexao = _mensagemAviso());
+  }
+
+  /// Texto da bolinha vermelha: o erro, de quando são os dados mostrados e
+  /// quantos envios esperam internet. Null = tudo certo (sem bolinha).
+  String? _mensagemAviso() {
+    final pendentes = FilaOffline.instancia.pendentes.value;
+    if (_erroApi == null) return null;
+    final partes = <String>[
+      _erroApi!,
+      if (_salvoEm != null)
+        'Mostrando os dados salvos em ${formatarSalvoEm(_salvoEm!)}.',
+      if (pendentes > 0)
+        pendentes == 1
+            ? '1 envio aguardando internet.'
+            : '$pendentes envios aguardando internet.',
+    ];
+    return partes.join(' ');
   }
 
   // Troque os debugPrint pela navegação real quando tiver as rotas.
   void _acao(String nome) => debugPrint('[BOTÃO] $nome');
 
+  /// Abre a tela de corrida e recarrega a home se a atividade for salva.
+  Future<void> _abrirCorrida({
+    required String titulo,
+    required String subtitulo,
+  }) async {
+    final salvou = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CorridaScreen(titulo: titulo, subtitulo: subtitulo),
+      ),
+    );
+    if (salvou == true && mounted) _carregar();
+  }
+
+  /// Troca de aba pela barra inferior (ou por botões como "Ver plano").
+  void _irParaAba(int i) {
+    if (i == _abaAtual) return;
+    setState(() => _abaAtual = i);
+    // Ao voltar para o Início, atualiza a semana e os km.
+    if (i == 0) _carregar();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _Cores.fundo,
+      // IndexedStack mantém cada aba viva: ao trocar de aba e voltar,
+      // a rolagem e os dados carregados continuam onde estavam.
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _abaAtual,
+            children: [
+              _abaInicio(),
+              const TreinosScreen(),
+              const EvolucaoScreen(),
+              const PerfilScreen(),
+            ],
+          ),
+          // Bolinha de erro de conexão (só na aba Início)
+          if (_erroConexao != null && _abaAtual == 0)
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _AvisoConexao(
+                mensagem: _erroConexao!,
+                onTentarDeNovo: _carregar,
+              ),
+            ),
+        ],
+      ),
+      bottomNavigationBar: _BarraInferior(
+        indiceAtual: _abaAtual,
+        onSelecionar: _irParaAba,
+      ),
+    );
+  }
+
+  /// Conteúdo da aba Início (a home que já existia).
+  Widget _abaInicio() {
     if (_carregando) {
-      return const Scaffold(
-        backgroundColor: _Cores.fundo,
-        body: Center(child: CircularProgressIndicator(color: _Cores.escuro)),
-      );
+      return Center(child: CircularProgressIndicator(color: _Cores.escuro));
     }
 
     final dados = _dados;
+    // Primeiro nome de quem se cadastrou (salvo no Firebase Auth)
+    final nomeExibido =
+        _primeiroNome(FirebaseAuth.instance.currentUser?.displayName);
 
-    return Scaffold(
-      backgroundColor: _Cores.fundo,
-      body: SafeArea(
+    return RefreshIndicator(
+      color: _Cores.escuro,
+      onRefresh: _carregar,
+      child: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _Cabecalho(
-                usuario: dados.nomeUsuario,
+                usuario: nomeExibido,
                 temNotificacao: dados.temNotificacao,
-                onNotificacoes: () => _acao('Notificações'),
-                onPerfil: () => _acao('Avatar Perfil'),
+                onNotificacoes: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificacoesScreen(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
               if (dados.treinoHoje != null)
                 _TreinoHojeCard(
                   treino: dados.treinoHoje!,
-                  onComecar: () => _acao('Começar treino: ${dados.treinoHoje!.titulo}'),
+                  onComecar: () => _abrirCorrida(
+                    titulo: dados.treinoHoje!.titulo,
+                    subtitulo: 'TREINO DE HOJE',
+                  ),
                 )
               else
                 _TreinoVazioCard(
-                  onTreinarMesmoAssim: () => _acao('Treino livre'),
+                  onTreinarMesmoAssim: () => _abrirCorrida(
+                    titulo: 'Corrida livre',
+                    subtitulo: 'TREINO LIVRE',
+                  ),
                 ),
               const SizedBox(height: 24),
               _SemanaCard(semana: dados.semana),
@@ -288,12 +480,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 24),
                 _ProximoTreinoSecao(
                   treino: dados.proximoTreino!,
-                  onVerPlano: () => _acao('Ver plano completo'),
-                  onTreino: () => _acao('Próximo treino: ${dados.proximoTreino!.nome}'),
+                  onVerPlano: () => _irParaAba(1),
+                  onTreino: () => _abrirCorrida(
+                    titulo: dados.proximoTreino!.nome,
+                    subtitulo: 'PRÓXIMO TREINO',
+                  ),
                 ),
               ],
               const SizedBox(height: 24),
-              _ExplorarCard(onTap: () => _acao('Rotas e descobertas')),
+              _ExplorarCard(
+                onTap: () async {
+                  final salvou = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RotasScreen()),
+                  );
+                  if (salvou == true && mounted) _carregar();
+                },
+              ),
               if (dados.treinador != null) ...[
                 const SizedBox(height: 24),
                 _TreinadorCard(
@@ -302,17 +505,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              _EmergenciaCard(onTap: () => _acao('Botão de emergência')),
+              _EmergenciaCard(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EmergenciaScreen()),
+                ),
+              ),
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: _BarraInferior(
-        indiceAtual: _abaAtual,
-        onSelecionar: (i) {
-          setState(() => _abaAtual = i);
-          _acao('Aba inferior: $i');
-        },
       ),
     );
   }
@@ -327,13 +528,11 @@ class _Cabecalho extends StatelessWidget {
     required this.usuario,
     required this.temNotificacao,
     required this.onNotificacoes,
-    required this.onPerfil,
   });
 
   final String usuario;
   final bool temNotificacao;
   final VoidCallback onNotificacoes;
-  final VoidCallback onPerfil;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +543,7 @@ class _Cabecalho extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'RUNNER',
                 style: TextStyle(
                   color: _Cores.verde,
@@ -358,7 +557,7 @@ class _Cabecalho extends StatelessWidget {
                 'Olá, $usuario',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: _Cores.escuro,
@@ -369,8 +568,8 @@ class _Cabecalho extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Material(
-          color: Colors.white,
-          shape: const CircleBorder(side: BorderSide(color: _Cores.borda)),
+          color: _Cores.card,
+          shape: CircleBorder(side: BorderSide(color: _Cores.borda)),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onNotificacoes,
@@ -380,7 +579,8 @@ class _Cabecalho extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.notifications_none_rounded, color: _Cores.escuro, size: 22),
+                  Icon(Icons.notifications_none_rounded,
+                      color: _Cores.escuro, size: 22),
                   if (temNotificacao)
                     Positioned(
                       top: 9,
@@ -391,23 +591,13 @@ class _Cabecalho extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: _Cores.destaque,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                          border: Border.all(color: _Cores.card, width: 1.5),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onPerfil,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: const BoxDecoration(color: _Cores.escuro, shape: BoxShape.circle),
-            child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 22),
           ),
         ),
       ],
@@ -434,7 +624,7 @@ class _TreinoHojeCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
-        color: _Cores.escuro,
+        color: _Cores.superficie,
         child: Stack(
           children: [
             Positioned.fill(
@@ -453,9 +643,9 @@ class _TreinoHojeCard extends StatelessWidget {
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      _Cores.escuro.withValues(alpha: 0.92),
-                      _Cores.escuro.withValues(alpha: 0.55),
-                      _Cores.escuro.withValues(alpha: 0.15),
+                      _Cores.tinta.withValues(alpha: 0.92),
+                      _Cores.tinta.withValues(alpha: 0.55),
+                      _Cores.tinta.withValues(alpha: 0.15),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),
@@ -468,7 +658,8 @@ class _TreinoHojeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: _Cores.destaque,
                       borderRadius: BorderRadius.circular(20),
@@ -476,12 +667,12 @@ class _TreinoHojeCard extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.bolt, size: 14, color: _Cores.escuro),
+                        Icon(Icons.bolt, size: 14, color: _Cores.tinta),
                         SizedBox(width: 4),
                         Text(
                           'TREINO DE HOJE',
                           style: TextStyle(
-                            color: _Cores.escuro,
+                            color: _Cores.tinta,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1,
@@ -507,7 +698,8 @@ class _TreinoHojeCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     treino.detalhes,
-                    style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 14),
+                    style:
+                        const TextStyle(color: Color(0xFFD1D5DB), fontSize: 14),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
@@ -518,9 +710,10 @@ class _TreinoHojeCard extends StatelessWidget {
                         color: _Cores.destaque,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.play_arrow_rounded, color: _Cores.escuro, size: 16),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: _Cores.tinta, size: 16),
                     ),
-                    label: const Text(
+                    label: Text(
                       'Começar treino',
                       style: TextStyle(
                         color: _Cores.escuro,
@@ -529,11 +722,12 @@ class _TreinoHojeCard extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: _Cores.card,
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25)),
                       elevation: 0,
                     ),
                   ),
@@ -549,20 +743,20 @@ class _TreinoHojeCard extends StatelessWidget {
 
 class _TreinoVazioCard extends StatelessWidget {
   const _TreinoVazioCard({required this.onTreinarMesmoAssim});
- 
+
   /// Chamado ao tocar em "Treinar mesmo assim" (treino livre, sem personal).
   final VoidCallback onTreinarMesmoAssim;
- 
+
   static const _imagemPadrao =
       'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop';
- 
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
-        color: _Cores.escuro,
+        color: _Cores.superficie,
         child: Stack(
           children: [
             Positioned.fill(
@@ -581,9 +775,9 @@ class _TreinoVazioCard extends StatelessWidget {
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      _Cores.escuro.withValues(alpha: 0.94),
-                      _Cores.escuro.withValues(alpha: 0.65),
-                      _Cores.escuro.withValues(alpha: 0.25),
+                      _Cores.tinta.withValues(alpha: 0.94),
+                      _Cores.tinta.withValues(alpha: 0.65),
+                      _Cores.tinta.withValues(alpha: 0.25),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),
@@ -596,7 +790,8 @@ class _TreinoVazioCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: _Cores.destaque,
                       borderRadius: BorderRadius.circular(20),
@@ -604,12 +799,12 @@ class _TreinoVazioCard extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.bolt, size: 14, color: _Cores.escuro),
+                        Icon(Icons.bolt, size: 14, color: _Cores.tinta),
                         SizedBox(width: 4),
                         Text(
                           'TREINO DE HOJE',
                           style: TextStyle(
-                            color: _Cores.escuro,
+                            color: _Cores.tinta,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1,
@@ -619,10 +814,10 @@ class _TreinoVazioCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  FractionallySizedBox(
+                  const FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     widthFactor: 0.65,
-                    child: const Text(
+                    child: Text(
                       'Nenhum treino para hoje',
                       style: TextStyle(
                         color: Colors.white,
@@ -638,7 +833,8 @@ class _TreinoVazioCard extends StatelessWidget {
                     child: Text(
                       'Não tem treino marcado ou ainda não tem um treinador? '
                       'Corra do seu jeito e registre sua atividade.',
-                      style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 14, height: 1.4),
+                      style: TextStyle(
+                          color: Color(0xFFD1D5DB), fontSize: 14, height: 1.4),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -650,9 +846,10 @@ class _TreinoVazioCard extends StatelessWidget {
                         color: _Cores.destaque,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.play_arrow_rounded, color: _Cores.escuro, size: 16),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: _Cores.tinta, size: 16),
                     ),
-                    label: const Text(
+                    label: Text(
                       'Treinar mesmo assim',
                       style: TextStyle(
                         color: _Cores.escuro,
@@ -661,11 +858,12 @@ class _TreinoVazioCard extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: _Cores.card,
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25)),
                       elevation: 0,
                     ),
                   ),
@@ -694,7 +892,8 @@ class _SemanaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hoje = DateTime.now();
     // Segunda-feira da semana atual (os números dos dias agora são reais)
-    final segunda = DateTime(hoje.year, hoje.month, hoje.day - (hoje.weekday - 1));
+    final segunda =
+        DateTime(hoje.year, hoje.month, hoje.day - (hoje.weekday - 1));
     final progresso = (semana.percentual / 100).clamp(0.0, 1.0);
 
     return Column(
@@ -704,7 +903,7 @@ class _SemanaCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -731,7 +930,7 @@ class _SemanaCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 3),
               child: Text(
                 '${semana.totalConcluidos} de ${semana.metaDias}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: _Cores.escuro,
@@ -744,7 +943,7 @@ class _SemanaCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: _Cores.card,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: _Cores.borda),
             boxShadow: [
@@ -759,7 +958,8 @@ class _SemanaCard extends StatelessWidget {
             children: [
               Row(
                 children: List.generate(7, (i) {
-                  final data = DateTime(segunda.year, segunda.month, segunda.day + i);
+                  final data =
+                      DateTime(segunda.year, segunda.month, segunda.day + i);
                   final ehHoje = data.year == hoje.year &&
                       data.month == hoje.month &&
                       data.day == hoje.day;
@@ -773,7 +973,7 @@ class _SemanaCard extends StatelessWidget {
                   );
                 }),
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Divider(height: 1, color: _Cores.borda),
               ),
@@ -783,10 +983,13 @@ class _SemanaCard extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEEF9C9),
+                      color: _modoEscuro
+                          ? const Color(0xFF2E3A12)
+                          : const Color(0xFFEEF9C9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.trending_up_rounded, color: _Cores.escuro, size: 20),
+                    child: Icon(Icons.trending_up_rounded,
+                        color: _Cores.escuro, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -795,7 +998,7 @@ class _SemanaCard extends StatelessWidget {
                       children: [
                         Text(
                           '${_formatarKm(semana.km)} km percorridos',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             color: _Cores.escuro,
@@ -803,14 +1006,15 @@ class _SemanaCard extends StatelessWidget {
                         ),
                         Text(
                           'Meta semanal: ${_formatarKm(semana.metaKm)} km',
-                          style: const TextStyle(color: _Cores.textoSecundario, fontSize: 12),
+                          style: TextStyle(
+                              color: _Cores.textoSecundario, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${semana.percentual}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                       color: _Cores.escuro,
@@ -853,7 +1057,7 @@ class _DiaItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color fundo = concluido
         ? _Cores.destaque
-        : (hoje ? _Cores.escuro : _Cores.cinzaClaro);
+        : (hoje ? _Cores.superficie : _Cores.cinzaClaro);
 
     final circulo = Container(
       width: 32,
@@ -861,7 +1065,7 @@ class _DiaItem extends StatelessWidget {
       decoration: BoxDecoration(color: fundo, shape: BoxShape.circle),
       child: Center(
         child: concluido
-            ? const Icon(Icons.check, size: 16, color: _Cores.escuro)
+            ? const Icon(Icons.check, size: 16, color: _Cores.tinta)
             : Text(
                 numero,
                 style: TextStyle(
@@ -877,7 +1081,7 @@ class _DiaItem extends StatelessWidget {
       children: [
         Text(
           letra,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             color: _Cores.textoSecundario,
             fontWeight: FontWeight.w700,
@@ -929,9 +1133,12 @@ class _ProximoTreinoSecao extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Próximos treinos',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _Cores.escuro),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _Cores.escuro),
             ),
             TextButton(
               onPressed: onVerPlano,
@@ -957,10 +1164,11 @@ class _ProximoTreinoSecao extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: _Cores.escuro,
+                  color: _Cores.superficie,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.directions_run_rounded, color: _Cores.destaque),
+                child: const Icon(Icons.directions_run_rounded,
+                    color: _Cores.destaque),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -974,7 +1182,7 @@ class _ProximoTreinoSecao extends StatelessWidget {
                             treino.dia.toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w700,
                               color: _Cores.textoSecundario,
@@ -986,7 +1194,7 @@ class _ProximoTreinoSecao extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             '•  ${treino.tipo!.toUpperCase()}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w700,
                               color: _Cores.verde,
@@ -999,7 +1207,7 @@ class _ProximoTreinoSecao extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       treino.nome,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: _Cores.escuro,
@@ -1008,12 +1216,13 @@ class _ProximoTreinoSecao extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       treino.resumo,
-                      style: const TextStyle(fontSize: 12, color: _Cores.textoSecundario),
+                      style: TextStyle(
+                          fontSize: 12, color: _Cores.textoSecundario),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, size: 22, color: _Cores.escuro),
+              Icon(Icons.chevron_right_rounded, size: 22, color: _Cores.escuro),
             ],
           ),
         ),
@@ -1051,7 +1260,7 @@ class _CardPressionavelState extends State<_CardPressionavel> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _Cores.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _pressionado ? _Cores.destaque : _Cores.borda,
@@ -1088,10 +1297,11 @@ class _ExplorarCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Container(
           width: double.infinity,
-          color: _Cores.escuro,
+          color: _Cores.superficie,
           child: Stack(
             children: [
-              const Positioned.fill(child: CustomPaint(painter: _RotaPainter())),
+              const Positioned.fill(
+                  child: CustomPaint(painter: _RotaPainter())),
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -1104,7 +1314,8 @@ class _ExplorarCard extends StatelessWidget {
                         color: _Cores.destaque,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.route_rounded, color: _Cores.escuro, size: 20),
+                      child: const Icon(Icons.route_rounded,
+                          color: _Cores.tinta, size: 20),
                     ),
                     const SizedBox(height: 22),
                     const Text(
@@ -1130,19 +1341,23 @@ class _ExplorarCard extends StatelessWidget {
                       padding: EdgeInsets.only(right: 100),
                       child: Text(
                         'Escolha onde correr ou siga sem rota definida.',
-                        style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13, height: 1.4),
+                        style: TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 13,
+                            height: 1.4),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Positioned(
+              Positioned(
                 right: 20,
                 bottom: 20,
                 child: CircleAvatar(
-                  backgroundColor: Colors.white,
+                  backgroundColor: _Cores.card,
                   radius: 20,
-                  child: Icon(Icons.arrow_forward_rounded, color: _Cores.escuro, size: 18),
+                  child: Icon(Icons.arrow_forward_rounded,
+                      color: _Cores.escuro, size: 18),
                 ),
               ),
             ],
@@ -1168,9 +1383,23 @@ class _RotaPainter extends CustomPainter {
       ..strokeWidth = 1;
 
     final linhas = [
-      [Offset(w * 0.58, 0), Offset(w * 0.68, h * 0.28), Offset(w * 0.85, h * 0.40), Offset(w, h * 0.52)],
-      [Offset(w * 0.52, h * 0.95), Offset(w * 0.72, h * 0.62), Offset(w * 0.90, h * 0.20), Offset(w, h * 0.08)],
-      [Offset(w * 0.75, 0), Offset(w * 0.82, h * 0.22), Offset(w * 0.98, h * 0.30)],
+      [
+        Offset(w * 0.58, 0),
+        Offset(w * 0.68, h * 0.28),
+        Offset(w * 0.85, h * 0.40),
+        Offset(w, h * 0.52)
+      ],
+      [
+        Offset(w * 0.52, h * 0.95),
+        Offset(w * 0.72, h * 0.62),
+        Offset(w * 0.90, h * 0.20),
+        Offset(w, h * 0.08)
+      ],
+      [
+        Offset(w * 0.75, 0),
+        Offset(w * 0.82, h * 0.22),
+        Offset(w * 0.98, h * 0.30)
+      ],
       [Offset(w * 0.62, h), Offset(w * 0.80, h * 0.82), Offset(w, h * 0.72)],
     ];
     for (final pontos in linhas) {
@@ -1245,7 +1474,7 @@ class _TreinadorCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: _Cores.escuro,
+                    backgroundColor: _Cores.superficie,
                     child: Text(
                       treinador.iniciais,
                       style: const TextStyle(
@@ -1265,7 +1494,8 @@ class _TreinadorCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: _Cores.destaque,
                           shape: BoxShape.circle,
-                          border: Border.all(color: _Cores.cardTreinador, width: 2),
+                          border:
+                              Border.all(color: _Cores.cardTreinador, width: 2),
                         ),
                       ),
                     ),
@@ -1276,13 +1506,14 @@ class _TreinadorCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Seu treinador',
-                      style: TextStyle(color: _Cores.textoSecundario, fontSize: 12),
+                      style: TextStyle(
+                          color: _Cores.textoSecundario, fontSize: 12),
                     ),
                     Text(
                       treinador.nome,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: _Cores.escuro,
@@ -1293,14 +1524,15 @@ class _TreinadorCard extends StatelessWidget {
               ),
               if (treinador.status.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _Cores.card,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     treinador.status.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       color: _Cores.escuro,
@@ -1314,7 +1546,7 @@ class _TreinadorCard extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               '“${treinador.mensagem}”',
-              style: const TextStyle(color: _Cores.escuro, fontSize: 15, height: 1.4),
+              style: TextStyle(color: _Cores.escuro, fontSize: 15, height: 1.4),
             ),
           ],
           const SizedBox(height: 18),
@@ -1326,10 +1558,11 @@ class _TreinadorCard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _Cores.escuro,
+              backgroundColor: _Cores.superficie,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               elevation: 0,
             ),
           ),
@@ -1358,7 +1591,8 @@ class _EmergenciaCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: _Cores.vermelhoFundo,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _Cores.vermelhoBorda.withValues(alpha: 0.5)),
+          border:
+              Border.all(color: _Cores.vermelhoBorda.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
@@ -1369,10 +1603,11 @@ class _EmergenciaCard extends StatelessWidget {
                 color: _Cores.vermelho,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.gpp_maybe_outlined, color: Colors.white, size: 24),
+              child: const Icon(Icons.gpp_maybe_outlined,
+                  color: Colors.white, size: 24),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1381,7 +1616,9 @@ class _EmergenciaCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFFDC2626),
+                      color: _modoEscuro
+                          ? const Color(0xFFF87171)
+                          : const Color(0xFFDC2626),
                       letterSpacing: 1,
                     ),
                   ),
@@ -1397,13 +1634,16 @@ class _EmergenciaCard extends StatelessWidget {
                   SizedBox(height: 2),
                   Text(
                     'Envie sua localização ao contato de confiança',
-                    style: TextStyle(fontSize: 12, color: _Cores.textoSecundario, height: 1.3),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: _Cores.textoSecundario,
+                        height: 1.3),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 22, color: _Cores.escuro),
+            Icon(Icons.chevron_right_rounded, size: 22, color: _Cores.escuro),
           ],
         ),
       ),
@@ -1431,7 +1671,8 @@ class _BarraInferior extends StatelessWidget {
 
   static const _itens = [
     _ItemAba(Icons.home_outlined, Icons.home_rounded, 'Início'),
-    _ItemAba(Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Treino'),
+    _ItemAba(
+        Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Treinos'),
     _ItemAba(Icons.trending_up_rounded, Icons.trending_up_rounded, 'Evolução'),
     _ItemAba(Icons.person_outline_rounded, Icons.person_rounded, 'Perfil'),
   ];
@@ -1439,8 +1680,8 @@ class _BarraInferior extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: _Cores.card,
         border: Border(top: BorderSide(color: _Cores.borda)),
       ),
       child: SafeArea(
@@ -1467,7 +1708,8 @@ class _BarraInferior extends StatelessWidget {
                           height: 3,
                           decoration: BoxDecoration(
                             color: ativo ? _Cores.destaque : Colors.transparent,
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
+                            borderRadius: const BorderRadius.vertical(
+                                bottom: Radius.circular(3)),
                           ),
                         ),
                       ),
@@ -1475,14 +1717,16 @@ class _BarraInferior extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(ativo ? item.iconeAtivo : item.icone, color: cor, size: 24),
+                            Icon(ativo ? item.iconeAtivo : item.icone,
+                                color: cor, size: 24),
                             const SizedBox(height: 3),
                             Text(
                               item.rotulo,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: cor,
-                                fontWeight: ativo ? FontWeight.w600 : FontWeight.w500,
+                                fontWeight:
+                                    ativo ? FontWeight.w600 : FontWeight.w500,
                               ),
                             ),
                           ],
@@ -1495,6 +1739,202 @@ class _BarraInferior extends StatelessWidget {
             }),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// AVISO DE CONEXÃO (bolinha vermelha que abre a mensagem)
+// =============================================================================
+
+class _AvisoConexao extends StatefulWidget {
+  const _AvisoConexao({required this.mensagem, required this.onTentarDeNovo});
+
+  final String mensagem;
+  final Future<void> Function() onTentarDeNovo;
+
+  @override
+  State<_AvisoConexao> createState() => _AvisoConexaoState();
+}
+
+class _AvisoConexaoState extends State<_AvisoConexao>
+    with SingleTickerProviderStateMixin {
+  bool _aberto = false;
+  bool _tentando = false;
+
+  // Pulso suave em volta da bolinha para chamar atenção.
+  late final AnimationController _pulso = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _pulso.dispose();
+    super.dispose();
+  }
+
+  void _alternar(bool abrir) {
+    HapticFeedback.selectionClick();
+    setState(() => _aberto = abrir);
+  }
+
+  Future<void> _tentar() async {
+    setState(() => _tentando = true);
+    await Sincronizador.instancia.sincronizar(imediato: true);
+    await widget.onTentarDeNovo();
+    if (mounted) setState(() => _tentando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutBack,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (filho, anim) => ScaleTransition(
+        scale: anim,
+        alignment: Alignment.bottomRight,
+        child: FadeTransition(opacity: anim, child: filho),
+      ),
+      child: _aberto ? _cartao() : _bolinha(),
+    );
+  }
+
+  Widget _bolinha() {
+    return GestureDetector(
+      key: const ValueKey('bolinha'),
+      onTap: () => _alternar(true),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulso,
+              builder: (_, __) => Container(
+                width: 28 + 28 * _pulso.value,
+                height: 28 + 28 * _pulso.value,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _Cores.vermelho
+                      .withValues(alpha: 0.35 * (1 - _pulso.value)),
+                ),
+              ),
+            ),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: _Cores.vermelho,
+                shape: BoxShape.circle,
+                border: Border.all(color: _Cores.card, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _Cores.vermelho.withValues(alpha: 0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  color: Colors.white, size: 15),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cartao() {
+    final largura = math.min(MediaQuery.of(context).size.width - 32, 320.0);
+    return Container(
+      key: const ValueKey('cartao'),
+      width: largura,
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: BoxDecoration(
+        color: _Cores.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _Cores.vermelho.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: _Cores.vermelho.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.wifi_off_rounded,
+                color: _Cores.vermelho, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 2),
+                Text(
+                  'Sem conexão',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: _Cores.escuro,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.mensagem,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: _Cores.textoSecundario,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: _tentando ? null : _tentar,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: _tentando
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: _Cores.vermelho),
+                          )
+                        : const Text(
+                            'Tentar de novo',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: _Cores.vermelho,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _alternar(false),
+            tooltip: 'Fechar',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close_rounded,
+                size: 20, color: _Cores.textoSecundario),
+          ),
+        ],
       ),
     );
   }
