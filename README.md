@@ -1,41 +1,138 @@
-#  Runner — Aplicativo de Treinos
+<div align="center">
 
-O **Runner** é um aplicativo mobile que ajuda as pessoas a treinar com orientação, mesmo quem treina por conta própria. Ele reúne treinos predefinidos por nível, um plano semanal, execução guiada, evolução e acompanhamento de um treinador em um único lugar.
+<img src="screenshots/banner.png" alt="Runner — Treine com orientação" width="100%">
 
-##  Proposta
+<br>
+<br>
 
-Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais, fazem treinos que não são do seu nível ou executam os exercícios do jeito errado. O Runner resolve isso com **treinos prontos para cada nível**, **instruções de execução** e **um treinador acompanhando** a evolução do atleta.
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-C6F432?style=for-the-badge)
 
-##  Funcionalidades
+</div>
 
--  **Treinos Predefinidos** — treinos prontos por nível (iniciante e intermediário), com duração e intensidade.
--  **Instruções de Execução** — cada exercício mostra como fazer, para treinar com a técnica correta.
--  **Plano Semanal** — plano com progressão gradual e meta da semana, sem saltos de carga.
--  **Treino Guiado** — cronômetro, exercício atual e próximo exercício, com opções de pausar, retomar e encerrar.
--  **Evolução** — treinos concluídos, constância semanal e histórico de desempenho.
--  **Treinador** — acompanha adesão e esforço, recebe os sinais de alerta do atleta, ajusta o plano e conversa pelo app.
--  **Segurança** — alerta de emergência com envio da localização para um contato de confiança nos treinos ao ar livre.
--  **Perfil** — gerenciamento dos dados do usuário e das preferências.
--  **Login** — acesso por e-mail, senha ou Google.
+# Runner — Aplicativo de Treinos
 
-##  Interface
+O **Runner** é um aplicativo mobile que ajuda as pessoas a treinar com orientação, mesmo quem treina por conta própria. Ele reúne treinos predefinidos por nível, execução guiada, evolução e acompanhamento de um personal trainer em um único lugar.
 
-O aplicativo utiliza uma interface **minimalista, moderna e intuitiva**, com predominância de preto e branco e destaques em verde-limão.
+## Proposta
 
-##  Navegação
+Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais, fazem treinos que não são do seu nível ou executam os exercícios do jeito errado. O Runner resolve isso com **treinos prontos para cada nível**, **treino guiado exercício a exercício** e **um personal trainer acompanhando** a evolução do aluno.
+
+## Telas
+
+### Acesso
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/login.png" width="220" alt="Login"></td>
+    <td align="center"><img src="screenshots/criar-conta.png" width="220" alt="Criar conta"></td>
+    <td align="center"><img src="screenshots/esqueceu-senha.png" width="220" alt="Esqueceu sua senha"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Login</b><br><sub>E-mail e senha ou Google</sub></td>
+    <td align="center"><b>Criar conta</b><br><sub>Cadastro com aceite dos termos</sub></td>
+    <td align="center"><b>Recuperar senha</b><br><sub>Link de redefinição por e-mail</sub></td>
+  </tr>
+</table>
+
+### Treinos
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/inicio.png" width="220" alt="Início"></td>
+    <td align="center"><img src="screenshots/treinos.png" width="220" alt="Treinos"></td>
+    <td align="center"><img src="screenshots/treino-guiado.png" width="220" alt="Treino guiado"></td>
+    <td align="center"><img src="screenshots/treino-gps.png" width="220" alt="Treino com GPS"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Início</b><br><sub>Treino de hoje e constância da semana</sub></td>
+    <td align="center"><b>Treinos</b><br><sub>Treinos predefinidos por tipo e nível</sub></td>
+    <td align="center"><b>Treino guiado</b><br><sub>Exercício a exercício, com cronômetro</sub></td>
+    <td align="center"><b>Treino ao ar livre</b><br><sub>Tempo, distância e pace com GPS</sub></td>
+  </tr>
+</table>
+
+### Personal trainer
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/area-do-aluno.png" width="220" alt="Área do aluno"></td>
+    <td align="center"><img src="screenshots/encontre-personal.png" width="220" alt="Encontre seu personal"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Área do aluno</b><br><sub>Plano, progresso da semana e próximos treinos</sub></td>
+    <td align="center"><b>Encontre seu personal</b><br><sub>Busca por nome ou cidade e pedido de contratação</sub></td>
+  </tr>
+</table>
+
+### Acompanhamento
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/evolucao.png" width="220" alt="Evolução"></td>
+    <td align="center"><img src="screenshots/perfil.png" width="220" alt="Perfil"></td>
+    <td align="center"><img src="screenshots/configuracoes.png" width="220" alt="Configurações"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Evolução</b><br><sub>Treinos por semana e tempo treinado</sub></td>
+    <td align="center"><b>Perfil</b><br><sub>Totais e média de treinos</sub></td>
+    <td align="center"><b>Configurações</b><br><sub>Conta, tema, notificações e unidades</sub></td>
+  </tr>
+</table>
+
+## Funcionalidades
+
+- **Treinos Predefinidos** — mobilidade, corrida, HIIT, core e mais, separados por tipo e nível (iniciante e intermediário), com duração.
+- **Treino Guiado** — mostra o exercício atual e o próximo, com cronômetro e opções de pausar, voltar e avançar.
+- **Treinos ao Ar Livre** — tempo, distância e pace com GPS.
+- **Progresso da Semana** — treinos concluídos, meta semanal e constância.
+- **Evolução** — treinos por semana, tempo treinado e histórico de desempenho.
+- **Personal Trainer** — encontre e contrate um personal; na área do aluno ficam o plano feito para o seu objetivo, os ajustes semanais e o feedback do personal, com conversa direto pelo app.
+- **Segurança** — botão de emergência durante o treino.
+- **Modo Offline** — avisa quando está sem conexão e mostra os dados quando a internet volta.
+- **Perfil e Configurações** — dados da conta, tema claro, escuro ou do sistema, notificações e unidade de distância.
+- **Login** — acesso por e-mail, senha ou Google, com recuperação de senha.
+
+## Interface
+
+O aplicativo utiliza uma interface **minimalista, moderna e intuitiva**, com predominância de preto e branco e destaques em verde-limão, além de suporte a tema escuro.
+
+## Navegação
 
 A navegação principal é composta por:
 
-- **Início** — treino de hoje e próximos treinos
-- **Plano** — plano semanal e treinos predefinidos
+- **Início** — treino de hoje e progresso da semana
+- **Treinos** — treinos predefinidos e agenda de treinos
 - **Evolução** — desempenho e constância
-- **Perfil** — conta, treinador e configurações
+- **Perfil** — conta, médias e configurações
 
-##  Status
+## Tecnologias
+
+**Aplicativo:** Flutter, Dart, Firebase Auth, Google Sign-In, geolocator e connectivity_plus.
+
+**API:** Node.js, Express, Prisma, MySQL 8, JWT, bcrypt, Zod e Swagger/OpenAPI.
+
+## Como rodar
+
+```bash
+git clone https://github.com/BancoCentraI/runner.git
+cd runner/runner-app
+flutter pub get
+echo "API_BASE_URL=https://sua-api.com.br/api" > .env
+flutter run
+```
+
+O login usa Firebase, então é preciso configurar um projeto Firebase para o app.
+
+## Status
 
 **Em desenvolvimento.**
 
-##  Equipe v2
+## Equipe v2
 
 - **José Anderson** — Desenvolvedor Mobile
 - **Felipe Bezerra** — Documentação
