@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="screenshots/banner.png" alt="Runner — Treine com orientação" width="100%">
+<img src="telas/banner.png" alt="Runner — Treine com orientação" width="100%">
 
 <br>
 <br>
@@ -28,9 +28,9 @@ Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais,
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/login.png" width="220" alt="Login"></td>
-    <td align="center"><img src="screenshots/criar-conta.png" width="220" alt="Criar conta"></td>
-    <td align="center"><img src="screenshots/esqueceu-senha.png" width="220" alt="Esqueceu sua senha"></td>
+    <td align="center"><img src="telas/login.png" width="220" alt="Login"></td>
+    <td align="center"><img src="telas/criar-conta.png" width="220" alt="Criar conta"></td>
+    <td align="center"><img src="telas/esqueceu-senha.png" width="220" alt="Esqueceu sua senha"></td>
   </tr>
   <tr>
     <td align="center"><b>Login</b><br><sub>E-mail e senha ou Google</sub></td>
@@ -43,10 +43,10 @@ Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais,
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/inicio.png" width="220" alt="Início"></td>
-    <td align="center"><img src="screenshots/treinos.png" width="220" alt="Treinos"></td>
-    <td align="center"><img src="screenshots/treino-guiado.png" width="220" alt="Treino guiado"></td>
-    <td align="center"><img src="screenshots/treino-gps.png" width="220" alt="Treino com GPS"></td>
+    <td align="center"><img src="telas/inicio.png" width="220" alt="Início"></td>
+    <td align="center"><img src="telas/treinos.png" width="220" alt="Treinos"></td>
+    <td align="center"><img src="telas/treino-guiado.png" width="220" alt="Treino guiado"></td>
+    <td align="center"><img src="telas/treino-gps.png" width="220" alt="Treino com GPS"></td>
   </tr>
   <tr>
     <td align="center"><b>Início</b><br><sub>Treino de hoje e constância da semana</sub></td>
@@ -60,8 +60,8 @@ Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais,
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/area-do-aluno.png" width="220" alt="Área do aluno"></td>
-    <td align="center"><img src="screenshots/encontre-personal.png" width="220" alt="Encontre seu personal"></td>
+    <td align="center"><img src="telas/area-do-aluno.png" width="220" alt="Área do aluno"></td>
+    <td align="center"><img src="telas/encontre-personal.png" width="220" alt="Encontre seu personal"></td>
   </tr>
   <tr>
     <td align="center"><b>Área do aluno</b><br><sub>Plano, progresso da semana e próximos treinos</sub></td>
@@ -73,9 +73,9 @@ Muitas pessoas se machucam ao treinar sozinhas: aumentam a carga rápido demais,
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/evolucao.png" width="220" alt="Evolução"></td>
-    <td align="center"><img src="screenshots/perfil.png" width="220" alt="Perfil"></td>
-    <td align="center"><img src="screenshots/configuracoes.png" width="220" alt="Configurações"></td>
+    <td align="center"><img src="telas/evolucao.png" width="220" alt="Evolução"></td>
+    <td align="center"><img src="telas/perfil.png" width="220" alt="Perfil"></td>
+    <td align="center"><img src="telas/configuracoes.png" width="220" alt="Configurações"></td>
   </tr>
   <tr>
     <td align="center"><b>Evolução</b><br><sub>Treinos por semana e tempo treinado</sub></td>
@@ -119,25 +119,8 @@ A navegação principal é composta por:
 ## Como rodar
 
 ```bash
-git clone https://github.com/BancoCentraI/runner.git
+git clone [https://github.com/BancoCentraI/runner.git](https://github.com/BancoCentraI/runner.git)
 cd runner/runner-app
 flutter pub get
-echo "API_BASE_URL=https://sua-api.com.br/api" > .env
+echo "API_BASE_URL=[https://sua-api.com.br/api](https://sua-api.com.br/api)" > .env
 flutter run
-```
-
-O login usa Firebase, então é preciso configurar um projeto Firebase para o app.
-
-## Status
-
-**Em desenvolvimento.**
-
-## Equipe v2
-
-- **José Anderson** — Desenvolvedor Mobile
-- **Felipe Bezerra** — Documentação
-- **Carlos Alberto** — Desenvolvimento da API
-- **Pedro Guilherme** — Wireframe Mobile
-- **Ryan Douglas** — Banco de Dados
-
-> **Runner — seu treino, sua evolução, sua segurança.**
