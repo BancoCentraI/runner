@@ -52,6 +52,16 @@ class _Cores {
 /// Tema atual (claro/escuro), controlado nas Configurações.
 bool get _modoEscuro => Preferencias.instancia.modoEscuro;
 
+/// A home é focada nos TREINOS do plano. As opções de corrida (corrida
+/// livre, rotas e descobertas, km da semana e botão de emergência com
+/// localização) ficam ocultas.
+/// Mude para `true` se quiser trazer tudo de volta.
+const bool _modoCorrida = false;
+
+/// Foto padrão dos cards de treino.
+const String _imagemTreinoPadrao =
+    'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop';
+
 // =============================================================================
 // MODELOS (convertem o JSON da API em objetos seguros)
 // =============================================================================
@@ -256,9 +266,9 @@ class _HomeApi {
     var km = 0.0;
     final dias = <int>{};
     for (final c in ApiOffline.corridasPendentes()) {
-      final data = DateTime.tryParse(
-              '${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
-          ?.toLocal();
+      final data =
+          DateTime.tryParse('${c['iniciadoEm'] ?? c['finalizadoEm'] ?? ''}')
+              ?.toLocal();
       if (data == null || data.isBefore(segunda)) continue;
       km += _toDouble(c['distanciaKm']);
       dias.add(data.weekday);
@@ -284,9 +294,8 @@ class _HomeApi {
         diasConcluidos: novosDias,
         km: kmTotal,
         metaKm: s.metaKm,
-        percentual: s.metaKm > 0
-            ? (kmTotal / s.metaKm * 100).round()
-            : s.percentual,
+        percentual:
+            s.metaKm > 0 ? (kmTotal / s.metaKm * 100).round() : s.percentual,
       ),
     );
   }
@@ -470,10 +479,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               else
                 _TreinoVazioCard(
-                  onTreinarMesmoAssim: () => _abrirCorrida(
-                    titulo: 'Corrida livre',
-                    subtitulo: 'TREINO LIVRE',
-                  ),
+                  onTreinarMesmoAssim: () => _modoCorrida
+                      ? _abrirCorrida(
+                          titulo: 'Corrida livre',
+                          subtitulo: 'TREINO LIVRE',
+                        )
+                      : _irParaAba(1),
                 ),
               const SizedBox(height: 24),
               _SemanaCard(semana: dados.semana),
@@ -488,16 +499,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 24),
-              _ExplorarCard(
-                onTap: () async {
-                  final salvou = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RotasScreen()),
-                  );
-                  if (salvou == true && mounted) _carregar();
-                },
-              ),
+              // Rotas e descobertas: só no modo corrida
+              if (_modoCorrida) ...[
+                const SizedBox(height: 24),
+                _ExplorarCard(
+                  onTap: () async {
+                    final salvou = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RotasScreen()),
+                    );
+                    if (salvou == true && mounted) _carregar();
+                  },
+                ),
+              ],
               if (dados.treinador != null) ...[
                 const SizedBox(height: 24),
                 _TreinadorCard(
@@ -505,13 +519,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onFalar: () => _acao('Falar com o treinador'),
                 ),
               ],
-              const SizedBox(height: 24),
-              _EmergenciaCard(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EmergenciaScreen()),
+              // Emergência (localização durante a corrida): só no modo corrida
+              if (_modoCorrida) ...[
+                const SizedBox(height: 24),
+                _EmergenciaCard(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EmergenciaScreen()),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -616,8 +633,7 @@ class _TreinoHojeCard extends StatelessWidget {
   final TreinoHoje treino;
   final VoidCallback onComecar;
 
-  static const _imagemPadrao =
-      'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop';
+  static const _imagemPadrao = _imagemTreinoPadrao;
 
   @override
   Widget build(BuildContext context) {
@@ -748,8 +764,7 @@ class _TreinoVazioCard extends StatelessWidget {
   /// Chamado ao tocar em "Treinar mesmo assim" (treino livre, sem personal).
   final VoidCallback onTreinarMesmoAssim;
 
-  static const _imagemPadrao =
-      'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop';
+  static const _imagemPadrao = _imagemTreinoPadrao;
 
   @override
   Widget build(BuildContext context) {
@@ -833,7 +848,7 @@ class _TreinoVazioCard extends StatelessWidget {
                     padding: EdgeInsets.only(right: 60),
                     child: Text(
                       'Não tem treino marcado ou ainda não tem um treinador? '
-                      'Corra do seu jeito e registre sua atividade.',
+                      'Veja seu plano e escolha um treino para fazer.',
                       style: TextStyle(
                           color: Color(0xFFD1D5DB), fontSize: 14, height: 1.4),
                     ),
@@ -851,7 +866,7 @@ class _TreinoVazioCard extends StatelessWidget {
                           color: _Cores.tinta, size: 16),
                     ),
                     label: Text(
-                      'Treinar mesmo assim',
+                      _modoCorrida ? 'Treinar mesmo assim' : 'Ver meus treinos',
                       style: TextStyle(
                         color: _Cores.escuro,
                         fontWeight: FontWeight.w600,
@@ -895,7 +910,21 @@ class _SemanaCard extends StatelessWidget {
     // Segunda-feira da semana atual (os números dos dias agora são reais)
     final segunda =
         DateTime(hoje.year, hoje.month, hoje.day - (hoje.weekday - 1));
-    final progresso = (semana.percentual / 100).clamp(0.0, 1.0);
+    // Modo treino: progresso = treinos feitos / meta de treinos da semana.
+    final percentual = _modoCorrida
+        ? semana.percentual
+        : (semana.metaDias > 0
+            ? (semana.totalConcluidos / semana.metaDias * 100).round()
+            : 0);
+    final progresso = (percentual / 100).clamp(0.0, 1.0);
+    final feitos = semana.totalConcluidos;
+    final titulo = _modoCorrida
+        ? '${_formatarKm(semana.km)} km percorridos'
+        : (feitos == 1 ? '1 treino concluído' : '$feitos treinos concluídos');
+    final meta = _modoCorrida
+        ? 'Meta semanal: ${_formatarKm(semana.metaKm)} km'
+        : 'Meta semanal: ${semana.metaDias} '
+            '${semana.metaDias == 1 ? 'treino' : 'treinos'}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -916,7 +945,7 @@ class _SemanaCard extends StatelessWidget {
                     letterSpacing: 1,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Consistência é o ritmo',
                   style: TextStyle(
@@ -975,7 +1004,7 @@ class _SemanaCard extends StatelessWidget {
                 }),
               ),
               Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Divider(height: 1, color: _Cores.borda),
               ),
               Row(
@@ -998,7 +1027,7 @@ class _SemanaCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${_formatarKm(semana.km)} km percorridos',
+                          titulo,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -1006,7 +1035,7 @@ class _SemanaCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Meta semanal: ${_formatarKm(semana.metaKm)} km',
+                          meta,
                           style: TextStyle(
                               color: _Cores.textoSecundario, fontSize: 12),
                         ),
@@ -1014,7 +1043,7 @@ class _SemanaCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${semana.percentual}%',
+                    '$percentual%',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -1623,7 +1652,7 @@ class _EmergenciaCard extends StatelessWidget {
                       letterSpacing: 1,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Botão de emergência',
                     style: TextStyle(
@@ -1632,7 +1661,7 @@ class _EmergenciaCard extends StatelessWidget {
                       color: _Cores.escuro,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Envie sua localização ao contato de confiança',
                     style: TextStyle(

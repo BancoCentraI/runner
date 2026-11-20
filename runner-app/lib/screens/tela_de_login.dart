@@ -189,8 +189,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!email.contains('@')) return 'Faltou o "@" no e-mail';
 
     final partes = email.split('@');
-    if (partes.length != 2)
+    if (partes.length != 2) {
       return 'E-mail inválido. Use algo como nome@email.com';
+    }
     if (partes[0].isEmpty) return 'Digite o nome antes do "@"';
 
     final dominio = partes[1];
@@ -200,8 +201,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final regex =
         RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*\.[a-zA-Z]{2,}$');
-    if (!regex.hasMatch(email))
+    if (!regex.hasMatch(email)) {
       return 'E-mail inválido. Use algo como nome@email.com';
+    }
     return null;
   }
 
@@ -216,8 +218,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _handleLoginEmail() async {
-    if (_segundosRestantesNotifier.value > 0 || _carregandoNotifier.value)
+    if (_segundosRestantesNotifier.value > 0 || _carregandoNotifier.value) {
       return;
+    }
 
     FocusScope.of(context).unfocus();
     _avisoNotifier.value = null;

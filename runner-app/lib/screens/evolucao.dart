@@ -98,6 +98,14 @@ String _tempo(int segundos) {
   return h > 0 ? '$h:${dois(m)}:${dois(s)}' : '${dois(m)}:${dois(s)}';
 }
 
+/// 8100 -> "2h 15min" | 2700 -> "45 min" | 0 -> "0 min"
+String _horas(int segundos) {
+  final h = segundos ~/ 3600;
+  final m = (segundos % 3600) ~/ 60;
+  if (h == 0) return '$m min';
+  return m == 0 ? '${h}h' : '${h}h ${m}min';
+}
+
 /// Converte e formata distâncias conforme a preferência (km ou milhas).
 class _Unidade {
   const _Unidade(this.milhas);
@@ -153,8 +161,7 @@ class TreinoFeito {
 
   /// Corpo de um POST /corridas que está na fila offline.
   static TreinoFeito? dePendente(Map<String, dynamic> c) {
-    final data =
-        _toData(c['iniciadoEm'] ?? c['finalizadoEm']);
+    final data = _toData(c['iniciadoEm'] ?? c['finalizadoEm']);
     if (data == null) return null;
     return TreinoFeito(
       titulo: _toStr(c['titulo']) ?? 'Corrida',
@@ -309,7 +316,9 @@ class _EvolucaoApi {
         cache: cache, query: {'semanas': '7'});
     if (r.erro != null) return (null, r.erro);
     final corpo = r.mapa;
-    return corpo != null ? (corpo, null) : (null, 'Resposta inválida do servidor.');
+    return corpo != null
+        ? (corpo, null)
+        : (null, 'Resposta inválida do servidor.');
   }
 }
 
@@ -397,7 +406,6 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
     final (corpo, erro) = await _EvolucaoApi.buscar();
     if (!mounted) return;
 
-
     setState(() {
       _carregando = false;
       _erro = erro;
@@ -451,14 +459,17 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
         .fold<double>(0, (s, t) => s + t.distanciaKm);
   }
 
-  /// Começa destacando a semana com mais km (ou a atual, se tudo for zero).
-  int? _semanaInicial(List<SemanaVolume> s) {
-    if (s.isEmpty) return null;
-    var maior = 0;
-    for (var i = 1; i < s.length; i++) {
-      if (s[i].km > s[maior].km) maior = i;
-    }
-    return s[maior].km > 0 ? maior : s.length - 1;
+  /// Começa destacando a semana atual (a última do gráfico).
+  int? _semanaInicial(List<SemanaVolume> s) => s.isEmpty ? null : s.length - 1;
+
+  /// Treinos feitos nos últimos 30 dias (inclui os que ainda não subiram).
+  List<TreinoFeito> _treinos30Dias(List<SemanaVolume> semanas) {
+    final limite = DateTime.now().subtract(const Duration(days: 30));
+    return [
+      for (final s in semanas)
+        for (final t in s.treinos)
+          if (t.data != null && t.data!.isAfter(limite)) t,
+    ];
   }
 
   void _selecionar(int i) {
@@ -515,6 +526,8 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
     final dados = _dados;
     final semanas = _semanasExibidas;
     final sel = _selecionada;
+    final treinos30 = _treinos30Dias(semanas);
+    final kmCorrida = dados.kmUltimos30Dias + _kmPendentes30Dias;
 
     return [
       // ---------- Situação da conexão ----------
@@ -548,37 +561,37 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
           Expanded(
             child: _CardResumo(
               escuro: true,
-              icone: Icons.route_rounded,
-              valor: unidade.numero(dados.kmUltimos30Dias + _kmPendentes30Dias),
-              rotulo: '${unidade.sigla} nos últimos 30 dias',
+              icone: Icons.calendar_month_outlined,
+              valor: '${treinos30.length}',
+              rotulo: treinos30.length == 1
+                  ? 'treino nos últimos 30 dias'
+                  : 'treinos nos últimos 30 dias',
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: dados.variacaoPercentual == null
-                ? _CardResumo(
-                    escuro: false,
-                    icone: Icons.calendar_month_outlined,
-                    valor:
-                        '${semanas.fold<int>(0, (s, w) => s + w.treinos.length)}',
-                    rotulo: 'treinos nas últimas semanas',
-                  )
-                : _CardResumo(
-                    escuro: false,
-                    icone: dados.variacaoPercentual! >= 0
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    valor: '${dados.variacaoPercentual! >= 0 ? '+' : ''}'
-                        '${dados.variacaoPercentual!.round()}%',
-                    rotulo: dados.mesComparacao != null
-                        ? 'volume em relação a ${dados.mesComparacao}'
-                        : 'volume em relação ao mês anterior',
-                  ),
+            child: _CardResumo(
+              escuro: false,
+              icone: Icons.timer_outlined,
+              valor: _horas(
+                  treinos30.fold<int>(0, (s, t) => s + t.duracaoSegundos)),
+              rotulo: 'de treino nos últimos 30 dias',
+            ),
           ),
         ],
       ),
 
-      // ---------- Ainda sem corridas ----------
+      // ---------- Corrida (secundário) ----------
+      if (kmCorrida > 0) ...[
+        const SizedBox(height: 12),
+        _FaixaCorrida(
+          km: unidade.distancia(kmCorrida),
+          variacao: dados.variacaoPercentual,
+          mes: dados.mesComparacao,
+        ),
+      ],
+
+      // ---------- Ainda sem treinos ----------
       if (dados.vazio &&
           !_carregando &&
           _erro == null &&
@@ -587,8 +600,8 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
         const _Aviso(
           icone: Icons.directions_run_rounded,
           titulo: 'Sua evolução começa aqui',
-          texto: 'Salve sua primeira corrida para ver o volume semanal, '
-              'as tendências e suas melhores marcas.',
+          texto: 'Faça seu primeiro treino para ver sua frequência, o tempo '
+              'treinado e suas melhores marcas.',
         ),
       ],
 
@@ -598,7 +611,6 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
         _CardGrafico(
           semanas: semanas,
           selecionada: sel,
-          unidade: unidade,
           onSelecionar: _selecionar,
         ),
       ],
@@ -631,7 +643,7 @@ class _EvolucaoScreenState extends State<EvolucaoScreen> {
       if (dados.melhoresMarcas.isNotEmpty) ...[
         const SizedBox(height: 28),
         Text(
-          'Melhores marcas',
+          'Melhores marcas na corrida',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
@@ -720,33 +732,100 @@ class _CardResumo extends StatelessWidget {
   }
 }
 
+/// Linha discreta com os km de corrida (a corrida continua no app,
+/// mas o destaque da tela é a frequência de treinos).
+class _FaixaCorrida extends StatelessWidget {
+  const _FaixaCorrida({required this.km, this.variacao, this.mes});
+
+  final String km;
+  final double? variacao;
+  final String? mes;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = variacao;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: _Cores.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _Cores.borda),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _Cores.destaqueClaro,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(Icons.route_rounded, size: 18, color: _Cores.escuro),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$km de corrida',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: _Cores.escuro,
+                    )),
+                Text('nos últimos 30 dias',
+                    style:
+                        TextStyle(fontSize: 12, color: _Cores.textoSecundario)),
+              ],
+            ),
+          ),
+          if (v != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('${v >= 0 ? '+' : ''}${v.round()}%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: v >= 0 ? _Cores.verde : _Cores.vermelho,
+                    )),
+                Text(mes != null ? 'vs $mes' : 'vs mês anterior',
+                    style:
+                        TextStyle(fontSize: 11, color: _Cores.textoSecundario)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // =============================================================================
-// GRÁFICO DE VOLUME SEMANAL (interativo)
+// GRÁFICO DE FREQUÊNCIA SEMANAL (interativo)
 // =============================================================================
 
 class _CardGrafico extends StatelessWidget {
   const _CardGrafico({
     required this.semanas,
     required this.selecionada,
-    required this.unidade,
     required this.onSelecionar,
   });
 
   final List<SemanaVolume> semanas;
   final int? selecionada;
-  final _Unidade unidade;
   final ValueChanged<int> onSelecionar;
 
   @override
   Widget build(BuildContext context) {
     final sel = selecionada;
-    final maxKm = semanas.map((s) => s.km).fold<double>(0, math.max);
+    final maxTreinos =
+        semanas.map((s) => s.treinos.length).fold<int>(0, math.max);
 
-    // Diferença da semana selecionada para a anterior.
-    double? diferenca;
+    // Diferença de treinos da semana selecionada para a anterior.
+    int? diferenca;
     if (sel != null && sel > 0) {
-      diferenca = semanas[sel].km - semanas[sel - 1].km;
-      if (diferenca == 0 && semanas[sel].km == 0) diferenca = null;
+      diferenca = semanas[sel].treinos.length - semanas[sel - 1].treinos.length;
+      if (diferenca == 0) diferenca = null;
     }
 
     return Container(
@@ -766,13 +845,12 @@ class _CardGrafico extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Volume semanal',
+                    Text('Frequência',
                         style: TextStyle(
                             fontSize: 13, color: _Cores.textoSecundario)),
                     const SizedBox(height: 4),
                     Text(
-                      'Últimas ${semanas.length} '
-                      '${semanas.length == 1 ? 'semana' : 'semanas'}',
+                      'Treinos por semana',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -787,9 +865,9 @@ class _CardGrafico extends StatelessWidget {
                   duration: const Duration(milliseconds: 200),
                   child: _Selo(
                     key: ValueKey(sel),
-                    texto: '${diferenca >= 0 ? '+' : '−'}'
-                        '${unidade.distancia(diferenca.abs())}',
-                    positivo: diferenca >= 0,
+                    texto: '${diferenca > 0 ? '+' : '−'}${diferenca.abs()} '
+                        '${diferenca.abs() == 1 ? 'treino' : 'treinos'}',
+                    positivo: diferenca > 0,
                   ),
                 ),
             ],
@@ -810,8 +888,10 @@ class _CardGrafico extends StatelessWidget {
                   Expanded(
                     child: _Barra(
                       ordem: i,
-                      fracao: maxKm > 0 ? semanas[i].km / maxKm : 0,
-                      rotulo: unidade.numero(semanas[i].km),
+                      fracao: maxTreinos > 0
+                          ? semanas[i].treinos.length / maxTreinos
+                          : 0,
+                      rotulo: '${semanas[i].treinos.length}',
                       selecionada: i == sel,
                       onTap: () => onSelecionar(i),
                     ),
@@ -878,7 +958,7 @@ class _Barra extends StatelessWidget {
             duration: Duration(milliseconds: 600 + ordem * 70),
             curve: Curves.easeOutCubic,
             builder: (_, v, __) {
-              // Altura mínima para semanas sem corrida continuarem tocáveis.
+              // Altura mínima para semanas sem treino continuarem tocáveis.
               final altura = math.max(alturaMax * v, 6.0);
               return Column(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1016,7 +1096,7 @@ class _TreinosDaSemana extends StatelessWidget {
                           ? 'Nenhum treino'
                           : '${treinos.length} '
                               '${treinos.length == 1 ? 'treino' : 'treinos'}'
-                              ' · ${unidade.distancia(semana.km)}',
+                              '${semana.km > 0 ? ' · ${unidade.distancia(semana.km)}' : ''}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -1076,6 +1156,7 @@ class _LinhaTreino extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pace = treino.pace;
+    final temDistancia = treino.distanciaKm > 0.05;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -1109,7 +1190,7 @@ class _LinhaTreino extends StatelessWidget {
                 Text(
                   [
                     if (treino.data != null) _dataTreino(treino.data!),
-                    if (treino.duracaoSegundos > 0)
+                    if (temDistancia && treino.duracaoSegundos > 0)
                       _tempo(treino.duracaoSegundos),
                   ].join(' · '),
                   style:
@@ -1141,14 +1222,16 @@ class _LinhaTreino extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                unidade.distancia(treino.distanciaKm),
+                temDistancia
+                    ? unidade.distancia(treino.distanciaKm)
+                    : _horas(treino.duracaoSegundos),
                 style: const TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
               ),
-              if (pace != null) ...[
+              if (temDistancia && pace != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   unidade.pace(pace),
@@ -1202,7 +1285,7 @@ class _CardMarca extends StatelessWidget {
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: _Cores.escuro,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -1304,9 +1387,8 @@ class _Aviso extends StatelessWidget {
     required this.icone,
     required this.titulo,
     required this.texto,
-    this.acao,
-    this.onAcao,
-  });
+  })  : acao = null,
+        onAcao = null;
 
   final IconData icone;
   final String titulo;

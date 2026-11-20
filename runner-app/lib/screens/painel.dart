@@ -16,6 +16,12 @@ import 'corrida.dart';
 //                ou  { "papel": "treinador", "treinador": {...} }
 // O aluno só vê os próprios dados; o treinador só vê os alunos dele.
 // Tudo funciona offline: leituras vêm do cache e envios entram na fila.
+//
+// Contratar personal:
+//   GET  /personais                         -> { "personais": [...] }
+//   POST /painel/contratacoes               (aluno pede)
+//   POST /painel/contratacoes/{id}/aceitar  (treinador responde)
+//   POST /painel/contratacoes/{id}/recusar
 
 // =============================================================================
 // CORES (mesma lógica do perfil: lidas do Theme, mudam sozinhas)
@@ -101,7 +107,8 @@ bool _mesmoDia(DateTime a, DateTime b) =>
 
 /// 6.0 -> "6" | 6.25 -> "6,3"
 String _km(double v) {
-  final t = v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  final t =
+      v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
   return t.replaceAll('.', ',');
 }
 
@@ -127,8 +134,18 @@ String _duracao(int segundos) {
 }
 
 const _meses = [
-  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-  'jul', 'ago', 'set', 'out', 'nov', 'dez',
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
 ];
 const _dias = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
 
@@ -145,10 +162,19 @@ String _dataLonga(DateTime d) {
 }
 
 String _iniciais(String nome) {
-  final p = nome.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+  final p =
+      nome.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
   if (p.isEmpty) return '?';
   if (p.length == 1) return p.first[0].toUpperCase();
   return (p.first[0] + p.last[0]).toUpperCase();
+}
+
+/// 189.0 -> "R$ 189" | 99.9 -> "R$ 99,90"
+String _reais(double v) {
+  final t = v == v.truncateToDouble()
+      ? v.toStringAsFixed(0)
+      : v.toStringAsFixed(2).replaceAll('.', ',');
+  return 'R\$ $t';
 }
 
 String _dataIso(DateTime d) =>
@@ -218,7 +244,8 @@ class TreinoPlano {
           ? realizadoSeg! / realizadoKm!
           : null);
 
-  static TreinoPlano? fromJson(Map<String, dynamic> j, {bool pendente = false}) {
+  static TreinoPlano? fromJson(Map<String, dynamic> j,
+      {bool pendente = false}) {
     final data = _toData(j['data']);
     final titulo = _toStr(j['titulo']);
     if (data == null || titulo == null) return null;
@@ -239,9 +266,8 @@ class TreinoPlano {
       instrucoes: _toStr(j['instrucoes']),
       concluido: j['concluido'] == true || r != null,
       realizadoKm: _toDoubleOuNulo(r?['distanciaKm']),
-      realizadoSeg: r?['duracaoSegundos'] == null
-          ? null
-          : _toInt(r?['duracaoSegundos']),
+      realizadoSeg:
+          r?['duracaoSegundos'] == null ? null : _toInt(r?['duracaoSegundos']),
       realizadoPace: _toDoubleOuNulo(r?['paceSegPorKm']),
       alunoId: _toStr(j['alunoId']) ?? _toStr(aluno?['id']),
       alunoNome: _toStr(j['alunoNome']) ?? _toStr(aluno?['nome']),
@@ -307,7 +333,8 @@ class FeedbackTreino {
         pendenteEnvio: pendenteEnvio,
       );
 
-  static FeedbackTreino? fromJson(Map<String, dynamic> j, {bool pendente = false}) {
+  static FeedbackTreino? fromJson(Map<String, dynamic> j,
+      {bool pendente = false}) {
     final texto = _toStr(j['texto']);
     if (texto == null) return null;
     final data = _toData(j['data']) ?? DateTime.now();
@@ -361,6 +388,29 @@ class PerfilAlunoInfo {
       );
 }
 
+/// Pedido de contratação que o aluno fez e ainda espera resposta.
+class ContratacaoPendente {
+  const ContratacaoPendente({
+    required this.personalNome,
+    this.planoNome,
+    this.data,
+  });
+
+  final String personalNome;
+  final String? planoNome;
+  final DateTime? data;
+
+  static ContratacaoPendente? fromJson(Map<String, dynamic>? j) {
+    final nome = _toStr(j?['personalNome']);
+    if (nome == null) return null;
+    return ContratacaoPendente(
+      personalNome: nome,
+      planoNome: _toStr(j?['planoNome']),
+      data: _toData(j?['data']),
+    );
+  }
+}
+
 class DadosAluno {
   const DadosAluno({
     this.metaKmSemana = 0,
@@ -368,6 +418,7 @@ class DadosAluno {
     this.semanas = const [],
     this.feedbacks = const [],
     this.perfil = const PerfilAlunoInfo(),
+    this.contratacao,
   });
 
   final double metaKmSemana;
@@ -375,6 +426,24 @@ class DadosAluno {
   final List<SemanaPlano> semanas;
   final List<FeedbackTreino> feedbacks;
   final PerfilAlunoInfo perfil;
+  final ContratacaoPendente? contratacao;
+
+  /// Ainda não tem personal.
+  bool get semPersonal => perfil.treinador == null;
+
+  DadosAluno copia({
+    List<FeedbackTreino>? feedbacks,
+    PerfilAlunoInfo? perfil,
+    ContratacaoPendente? contratacao,
+  }) =>
+      DadosAluno(
+        metaKmSemana: metaKmSemana,
+        treinos: treinos,
+        semanas: semanas,
+        feedbacks: feedbacks ?? this.feedbacks,
+        perfil: perfil ?? this.perfil,
+        contratacao: contratacao ?? this.contratacao,
+      );
 
   factory DadosAluno.fromJson(Map<String, dynamic> j) {
     final perfil = j['perfil'] is Map<String, dynamic>
@@ -398,6 +467,10 @@ class DadosAluno {
           .toList()
         ..sort((a, b) => b.data.compareTo(a.data)),
       perfil: PerfilAlunoInfo.fromJson(perfil),
+      contratacao: ContratacaoPendente.fromJson(
+          j['contratacao'] is Map<String, dynamic>
+              ? j['contratacao'] as Map<String, dynamic>
+              : null),
     );
   }
 }
@@ -467,6 +540,42 @@ class AvisoTreinador {
   }
 }
 
+/// Pedido de um novo aluno para contratar o treinador.
+class PedidoContratacao {
+  const PedidoContratacao({
+    required this.id,
+    required this.alunoNome,
+    this.nivel,
+    this.objetivo,
+    this.plano,
+    this.mensagem,
+    this.data,
+  });
+
+  final String id;
+  final String alunoNome;
+  final String? nivel;
+  final String? objetivo;
+  final String? plano;
+  final String? mensagem;
+  final DateTime? data;
+
+  static PedidoContratacao? fromJson(Map<String, dynamic> j) {
+    final id = _toStr(j['id']);
+    final nome = _toStr(j['alunoNome']);
+    if (id == null || nome == null) return null;
+    return PedidoContratacao(
+      id: id,
+      alunoNome: nome,
+      nivel: _toStr(j['nivel']),
+      objetivo: _toStr(j['objetivo']),
+      plano: _toStr(j['plano']),
+      mensagem: _toStr(j['mensagem']),
+      data: _toData(j['data']),
+    );
+  }
+}
+
 class DadosTreinador {
   const DadosTreinador({
     this.alunos = const [],
@@ -474,6 +583,7 @@ class DadosTreinador {
     this.desempenho = const [],
     this.feedbacks = const [],
     this.avisos = const [],
+    this.pedidos = const [],
   });
 
   final List<AlunoResumo> alunos;
@@ -481,6 +591,19 @@ class DadosTreinador {
   final List<SemanaPlano> desempenho;
   final List<FeedbackTreino> feedbacks;
   final List<AvisoTreinador> avisos;
+  final List<PedidoContratacao> pedidos;
+
+  DadosTreinador semPedido(String id) => DadosTreinador(
+        alunos: alunos,
+        agenda: agenda,
+        desempenho: desempenho,
+        feedbacks: feedbacks,
+        avisos: avisos,
+        pedidos: [
+          for (final p in pedidos)
+            if (p.id != id) p
+        ],
+      );
 
   factory DadosTreinador.fromJson(Map<String, dynamic> j) => DadosTreinador(
         alunos: _lista(j['alunos'])
@@ -508,7 +631,115 @@ class DadosTreinador {
             .whereType<AvisoTreinador>()
             .toList()
           ..sort((a, b) => b.data.compareTo(a.data)),
+        pedidos: _lista(j['contratacoes'])
+            .map(PedidoContratacao.fromJson)
+            .whereType<PedidoContratacao>()
+            .toList(),
       );
+}
+
+class PlanoPersonal {
+  const PlanoPersonal({
+    required this.id,
+    required this.nome,
+    required this.precoMensal,
+    this.descricao,
+    this.itens = const [],
+    this.destaque = false,
+  });
+
+  final String id;
+  final String nome;
+  final double precoMensal;
+  final String? descricao;
+  final List<String> itens;
+  final bool destaque;
+
+  static PlanoPersonal? fromJson(Map<String, dynamic> j) {
+    final id = _toStr(j['id']);
+    final nome = _toStr(j['nome']);
+    if (id == null || nome == null) return null;
+    return PlanoPersonal(
+      id: id,
+      nome: nome,
+      precoMensal: _toDouble(j['precoMensal']),
+      descricao: _toStr(j['descricao']),
+      itens: j['itens'] is List
+          ? (j['itens'] as List).map(_toStr).whereType<String>().toList()
+          : const [],
+      destaque: j['destaque'] == true,
+    );
+  }
+}
+
+class PersonalInfo {
+  const PersonalInfo({
+    required this.id,
+    required this.nome,
+    this.cref,
+    this.especialidades = const [],
+    this.nota,
+    this.avaliacoes = 0,
+    this.alunos = 0,
+    this.anosExperiencia,
+    this.cidade,
+    this.online = false,
+    this.presencial = false,
+    this.bio,
+    this.planos = const [],
+  });
+
+  final String id;
+  final String nome;
+  final String? cref;
+  final List<String> especialidades;
+  final double? nota;
+  final int avaliacoes;
+  final int alunos;
+  final int? anosExperiencia;
+  final String? cidade;
+  final bool online;
+  final bool presencial;
+  final String? bio;
+  final List<PlanoPersonal> planos;
+
+  double? get aPartirDe =>
+      planos.isEmpty ? null : planos.map((p) => p.precoMensal).reduce(math.min);
+
+  String get atendimento => [
+        if (online) 'Online',
+        if (presencial) 'Presencial',
+      ].join(' e ');
+
+  static PersonalInfo? fromJson(Map<String, dynamic> j) {
+    final id = _toStr(j['id']);
+    final nome = _toStr(j['nome']);
+    if (id == null || nome == null) return null;
+    return PersonalInfo(
+      id: id,
+      nome: nome,
+      cref: _toStr(j['cref']),
+      especialidades: j['especialidades'] is List
+          ? (j['especialidades'] as List)
+              .map(_toStr)
+              .whereType<String>()
+              .toList()
+          : const [],
+      nota: _toDoubleOuNulo(j['nota']),
+      avaliacoes: _toInt(j['avaliacoes']),
+      alunos: _toInt(j['alunos']),
+      anosExperiencia:
+          j['anosExperiencia'] == null ? null : _toInt(j['anosExperiencia']),
+      cidade: _toStr(j['cidade']),
+      online: j['online'] == true,
+      presencial: j['presencial'] == true,
+      bio: _toStr(j['bio']),
+      planos: _lista(j['planos'])
+          .map(PlanoPersonal.fromJson)
+          .whereType<PlanoPersonal>()
+          .toList(),
+    );
+  }
 }
 
 // =============================================================================
@@ -533,7 +764,8 @@ class _PainelApi {
 
     if (j == null) {
       final perfil = await CacheLocal.ler('perfil');
-      final eh = perfil?.dados is Map && (perfil!.dados as Map)['ehTreinador'] == true;
+      final eh =
+          perfil?.dados is Map && (perfil!.dados as Map)['ehTreinador'] == true;
       return (
         papel: eh ? Papel.treinador : Papel.aluno,
         aluno: eh ? null : _mesclarAluno(const DadosAluno()),
@@ -549,7 +781,8 @@ class _PainelApi {
 
     return (
       papel: treinador ? Papel.treinador : Papel.aluno,
-      aluno: treinador ? null : _mesclarAluno(DadosAluno.fromJson(bloco('aluno'))),
+      aluno:
+          treinador ? null : _mesclarAluno(DadosAluno.fromJson(bloco('aluno'))),
       treinador: treinador
           ? _mesclarTreinador(DadosTreinador.fromJson(bloco('treinador')))
           : null,
@@ -560,21 +793,25 @@ class _PainelApi {
 
   /// Aplica o que o aluno fez offline: perfil editado, feedbacks lidos.
   static DadosAluno _mesclarAluno(DadosAluno d) {
-    final edicoes = FilaOffline.instancia.corpos(metodo: 'PUT', caminho: '/perfil');
+    final edicoes =
+        FilaOffline.instancia.corpos(metodo: 'PUT', caminho: '/perfil');
     final lidos = FilaOffline.instancia
         .caminhos('PATCH')
-        .map((c) => RegExp(r'^/painel/feedbacks/(.+)/lido$').firstMatch(c)?.group(1))
+        .map((c) =>
+            RegExp(r'^/painel/feedbacks/(.+)/lido$').firstMatch(c)?.group(1))
         .whereType<String>()
         .toSet();
-    if (edicoes.isEmpty && lidos.isEmpty) return d;
-    return DadosAluno(
-      metaKmSemana: d.metaKmSemana,
-      treinos: d.treinos,
-      semanas: d.semanas,
+    final contratacoes = FilaOffline.instancia
+        .corpos(metodo: 'POST', caminho: '/painel/contratacoes');
+    if (edicoes.isEmpty && lidos.isEmpty && contratacoes.isEmpty) return d;
+    return d.copia(
       feedbacks: [
         for (final f in d.feedbacks) lidos.contains(f.id) ? f.lidoAgora() : f,
       ],
       perfil: edicoes.isEmpty ? d.perfil : d.perfil.com(edicoes.last),
+      contratacao: contratacoes.isEmpty
+          ? null
+          : ContratacaoPendente.fromJson(contratacoes.last),
     );
   }
 
@@ -593,7 +830,16 @@ class _PainelApi {
             {...c, 'alunoNome': c['alunoNome'] ?? nomes[c['alunoId']]},
             pendente: true))
         .whereType<FeedbackTreino>();
-    if (novosTreinos.isEmpty && novosFeedbacks.isEmpty) return d;
+    final respondidos = FilaOffline.instancia
+        .caminhos('POST')
+        .map((c) => RegExp(r'^/painel/contratacoes/(.+)/(aceitar|recusar)$')
+            .firstMatch(c)
+            ?.group(1))
+        .whereType<String>()
+        .toSet();
+    if (novosTreinos.isEmpty && novosFeedbacks.isEmpty && respondidos.isEmpty) {
+      return d;
+    }
     return DadosTreinador(
       alunos: d.alunos,
       agenda: [...d.agenda, ...novosTreinos]
@@ -602,13 +848,18 @@ class _PainelApi {
       feedbacks: [...novosFeedbacks, ...d.feedbacks]
         ..sort((a, b) => b.data.compareTo(a.data)),
       avisos: d.avisos,
+      pedidos: [
+        for (final p in d.pedidos)
+          if (!respondidos.contains(p.id)) p,
+      ],
     );
   }
 
   /// GET /painel/alunos/{id} — perfil completo de um aluno (treinador).
   static Future<({Map<String, dynamic>? dados, String? erro})> aluno(
       String id) async {
-    final r = await ApiOffline.buscar('/painel/alunos/$id', cache: 'painel_aluno_$id');
+    final r = await ApiOffline.buscar('/painel/alunos/$id',
+        cache: 'painel_aluno_$id');
     return (dados: r.mapa, erro: r.erro);
   }
 
@@ -618,12 +869,38 @@ class _PainelApi {
   static Future<ResultadoEnvio> enviarFeedback(Map<String, dynamic> corpo) =>
       ApiOffline.enviar('POST', '/painel/feedbacks', corpo: corpo);
 
-  static Future<ResultadoEnvio> marcarLido(String id) => ApiOffline.enviar(
-      'PATCH', '/painel/feedbacks/$id/lido',
-      substitui: 'painel-feedback-lido-$id');
+  static Future<ResultadoEnvio> marcarLido(String id) =>
+      ApiOffline.enviar('PATCH', '/painel/feedbacks/$id/lido',
+          substitui: 'painel-feedback-lido-$id');
 
   static Future<ResultadoEnvio> salvarPerfil(Map<String, dynamic> corpo) =>
-      ApiOffline.enviar('PUT', '/perfil', corpo: corpo, substitui: 'perfil-edicao');
+      ApiOffline.enviar('PUT', '/perfil',
+          corpo: corpo, substitui: 'perfil-edicao');
+
+  // ---------------- Contratar personal ----------------
+
+  /// GET /personais — lista de personais disponíveis para contratar.
+  static Future<({List<PersonalInfo> personais, String? erro})>
+      personais() async {
+    List<PersonalInfo> ler(Map<String, dynamic>? j) => _lista(j?['personais'])
+        .map(PersonalInfo.fromJson)
+        .whereType<PersonalInfo>()
+        .toList();
+
+    final r = await ApiOffline.buscar('/personais', cache: 'personais');
+    return (personais: ler(r.mapa), erro: r.mapa == null ? r.erro : null);
+  }
+
+  /// POST /painel/contratacoes — aluno pede para contratar um personal.
+  static Future<ResultadoEnvio> contratar(Map<String, dynamic> corpo) =>
+      ApiOffline.enviar('POST', '/painel/contratacoes',
+          corpo: corpo, substitui: 'painel-contratacao');
+
+  /// POST /painel/contratacoes/{id}/aceitar|recusar — treinador responde.
+  static Future<ResultadoEnvio> responderPedido(String id, bool aceitar) =>
+      ApiOffline.enviar(
+          'POST', '/painel/contratacoes/$id/${aceitar ? 'aceitar' : 'recusar'}',
+          substitui: 'painel-contratacao-$id');
 }
 
 // =============================================================================
@@ -816,13 +1093,9 @@ class _PainelScreenState extends State<PainelScreen> {
   Future<void> _lerFeedback(FeedbackTreino f) async {
     if (f.lido) return;
     setState(() {
-      _aluno = DadosAluno(
-        metaKmSemana: _aluno.metaKmSemana,
-        treinos: _aluno.treinos,
-        semanas: _aluno.semanas,
-        feedbacks: [for (final x in _aluno.feedbacks) x.id == f.id ? x.lidoAgora() : x],
-        perfil: _aluno.perfil,
-      );
+      _aluno = _aluno.copia(feedbacks: [
+        for (final x in _aluno.feedbacks) x.id == f.id ? x.lidoAgora() : x
+      ]);
     });
     await _PainelApi.marcarLido(f.id);
   }
@@ -838,15 +1111,7 @@ class _PainelScreenState extends State<PainelScreen> {
       ),
     );
     if (corpo == null || !mounted) return;
-    setState(() {
-      _aluno = DadosAluno(
-        metaKmSemana: _aluno.metaKmSemana,
-        treinos: _aluno.treinos,
-        semanas: _aluno.semanas,
-        feedbacks: _aluno.feedbacks,
-        perfil: _aluno.perfil.com(corpo),
-      );
-    });
+    setState(() => _aluno = _aluno.copia(perfil: _aluno.perfil.com(corpo)));
     final nome = _toStr(corpo['nome']);
     if (nome != null) {
       try {
@@ -855,6 +1120,71 @@ class _PainelScreenState extends State<PainelScreen> {
     }
     final r = await _PainelApi.salvarPerfil(corpo);
     if (mounted) _avisoEnvio(r, 'Perfil');
+  }
+
+  // ---------------- Contratar personal ----------------
+
+  /// Aluno: abre a lista de personais. Se enviar um pedido, recarrega.
+  Future<void> _contratarPersonal() async {
+    HapticFeedback.selectionClick();
+    final enviou = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _TelaPersonais(objetivo: _aluno.perfil.objetivo),
+      ),
+    );
+    if (enviou == true && mounted) _carregar();
+  }
+
+  /// Treinador: aceita ou recusa um pedido de novo aluno.
+  Future<void> _responderPedido(PedidoContratacao pedido, bool aceitar) async {
+    if (!aceitar) {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final p = _Paleta.of(ctx);
+          return AlertDialog(
+            backgroundColor: p.card,
+            title: Text('Recusar pedido?',
+                style: TextStyle(color: p.texto, fontWeight: FontWeight.w800)),
+            content: Text(
+                '${pedido.alunoNome} será avisado(a) de que você não pode '
+                'aceitar agora.',
+                style: TextStyle(color: p.textoSecundario)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Voltar', style: TextStyle(color: p.texto)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Recusar',
+                    style: TextStyle(
+                        color: _vermelho, fontWeight: FontWeight.w800)),
+              ),
+            ],
+          );
+        },
+      );
+      if (confirmar != true || !mounted) return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() => _treinador = _treinador.semPedido(pedido.id));
+    final r = await _PainelApi.responderPedido(pedido.id, aceitar);
+    if (!mounted) return;
+    switch (r) {
+      case ResultadoEnvio.enviado:
+        _aviso(aceitar
+            ? '${pedido.alunoNome} agora é seu aluno(a). 🎉'
+            : 'Pedido recusado.');
+      case ResultadoEnvio.naFila:
+        _aviso('Resposta salva no celular. Será enviada quando houver '
+            'internet.');
+      case ResultadoEnvio.recusado:
+        _aviso('O servidor recusou. Tente de novo.', erro: true);
+    }
+    _carregar();
   }
 
   // ---------------- Interface ----------------
@@ -894,6 +1224,8 @@ class _PainelScreenState extends State<PainelScreen> {
               naoLidos: _papel == Papel.aluno
                   ? _aluno.feedbacks.where((f) => !f.lido).length
                   : 0,
+              pedidos:
+                  _papel == Papel.treinador ? _treinador.pedidos.length : 0,
               onAba: _irPara,
             ),
             if (_erro != null && !_carregando)
@@ -951,6 +1283,7 @@ class _PainelScreenState extends State<PainelScreen> {
           onExecutar: _executar,
           onVerFeedbacks: () => _irPara(3),
           onVerTreinos: () => _irPara(1),
+          onContratar: _contratarPersonal,
         );
       case 1:
         return _AlunoTreinos(dados: _aluno, onDetalhe: _abrirDetalhe);
@@ -963,7 +1296,11 @@ class _PainelScreenState extends State<PainelScreen> {
           onTocar: _lerFeedback,
         );
       default:
-        return _AlunoPerfil(dados: _aluno, onEditar: _editarPerfil);
+        return _AlunoPerfil(
+          dados: _aluno,
+          onEditar: _editarPerfil,
+          onContratar: _contratarPersonal,
+        );
     }
   }
 
@@ -976,6 +1313,7 @@ class _PainelScreenState extends State<PainelScreen> {
           onAluno: _abrirAluno,
           onVerAgenda: () => _irPara(2),
           onVerAvisos: () => _irPara(5),
+          onResponderPedido: _responderPedido,
         );
       case 1:
         return _TreinadorAlunos(dados: _treinador, onAluno: _abrirAluno);
@@ -1011,6 +1349,7 @@ class _Topo extends StatelessWidget {
     required this.abas,
     required this.abaAtual,
     required this.naoLidos,
+    this.pedidos = 0,
     required this.onAba,
   });
 
@@ -1020,6 +1359,9 @@ class _Topo extends StatelessWidget {
   final List<(IconData, String)> abas;
   final int abaAtual;
   final int naoLidos;
+
+  /// Pedidos de novos alunos (selo na aba Dashboard do treinador).
+  final int pedidos;
   final ValueChanged<int> onAba;
 
   @override
@@ -1122,7 +1464,11 @@ class _Topo extends StatelessWidget {
                         icone: abas[i].$1,
                         rotulo: abas[i].$2,
                         ativo: i == abaAtual,
-                        selo: abas[i].$2 == 'Feedbacks' ? naoLidos : 0,
+                        selo: switch (abas[i].$2) {
+                          'Feedbacks' => naoLidos,
+                          'Dashboard' => pedidos,
+                          _ => 0,
+                        },
                         onTap: () => onAba(i),
                       ),
                     ),
@@ -1169,9 +1515,8 @@ class _ChipAba extends StatelessWidget {
         decoration: BoxDecoration(
           color: fundo,
           borderRadius: BorderRadius.circular(20),
-          border: ativo
-              ? null
-              : Border.all(color: p.vidro.withValues(alpha: 0.12)),
+          border:
+              ativo ? null : Border.all(color: p.vidro.withValues(alpha: 0.12)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1365,7 +1710,7 @@ class _Titulo extends StatelessWidget {
 }
 
 class _Cartao extends StatelessWidget {
-  const _Cartao({required this.child, this.onTap, this.padding, this.cor});
+  const _Cartao({required this.child, this.onTap, this.padding}) : cor = null;
 
   final Widget child;
   final VoidCallback? onTap;
@@ -1458,7 +1803,8 @@ class _Numero extends StatelessWidget {
 }
 
 class _Vazio extends StatelessWidget {
-  const _Vazio({required this.icone, required this.titulo, required this.texto});
+  const _Vazio(
+      {required this.icone, required this.titulo, required this.texto});
 
   final IconData icone;
   final String titulo;
@@ -1662,7 +2008,9 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
         1, (m, w) => math.max(m, math.max(w.planejadoKm, w.realizadoKm)));
     final sel = math.max(0, math.min(_sel ?? s.length - 1, s.length - 1));
     final w = s[sel];
-    final pct = w.planejadoKm > 0 ? (w.realizadoKm / w.planejadoKm * 100).round() : null;
+    final pct = w.planejadoKm > 0
+        ? (w.realizadoKm / w.planejadoKm * 100).round()
+        : null;
 
     return _Cartao(
       child: Column(
@@ -1675,7 +2023,8 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Semana de ${_dataCurta(w.inicio)}',
-                        style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                        style: TextStyle(
+                            fontSize: 12.5, color: p.textoSecundario)),
                     const SizedBox(height: 2),
                     Text('${_km(w.realizadoKm)} de ${_km(w.planejadoKm)} km',
                         style: TextStyle(
@@ -1687,7 +2036,8 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
               ),
               if (pct != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: pct >= 90 ? p.destaqueSuave : p.laranjaSuave,
                     borderRadius: BorderRadius.circular(20),
@@ -1727,31 +2077,38 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
                                 children: [
                                   // Planejado
                                   Container(
-                                    height: math.max(alt * s[i].planejadoKm / maximo, 4),
+                                    height: math.max(
+                                        alt * s[i].planejadoKm / maximo, 4),
                                     decoration: BoxDecoration(
                                       borderRadius: const BorderRadius.vertical(
                                           top: Radius.circular(8)),
                                       border: Border.all(
-                                          color: p.textoSecundario.withValues(alpha: 0.5),
+                                          color: p.textoSecundario
+                                              .withValues(alpha: 0.5),
                                           width: 1.2),
                                     ),
                                   ),
                                   // Realizado
                                   TweenAnimationBuilder<double>(
-                                    tween: Tween(begin: 0, end: s[i].realizadoKm / maximo),
-                                    duration: Duration(milliseconds: 500 + i * 60),
+                                    tween: Tween(
+                                        begin: 0,
+                                        end: s[i].realizadoKm / maximo),
+                                    duration:
+                                        Duration(milliseconds: 500 + i * 60),
                                     curve: Curves.easeOutCubic,
                                     builder: (_, v, __) => Container(
                                       height: math.max(alt * v, 3),
-                                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 3),
                                       decoration: BoxDecoration(
                                         color: i == sel
                                             ? _destaque
                                             : (p.escuro
                                                 ? const Color(0xFF55682A)
                                                 : const Color(0xFFC6E86A)),
-                                        borderRadius: const BorderRadius.vertical(
-                                            top: Radius.circular(6)),
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                                top: Radius.circular(6)),
                                       ),
                                     ),
                                   ),
@@ -1762,8 +2119,12 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
                             Text('${s[i].inicio.day}/${s[i].inicio.month}',
                                 style: TextStyle(
                                     fontSize: 10,
-                                    fontWeight: i == sel ? FontWeight.w800 : FontWeight.w500,
-                                    color: i == sel ? p.texto : p.textoSecundario)),
+                                    fontWeight: i == sel
+                                        ? FontWeight.w800
+                                        : FontWeight.w500,
+                                    color: i == sel
+                                        ? p.texto
+                                        : p.textoSecundario)),
                           ],
                         );
                       }),
@@ -1776,9 +2137,10 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
           const SizedBox(height: 10),
           Row(
             children: [
-              _Legenda(cor: _destaque, texto: 'Realizado'),
+              const _Legenda(cor: _destaque, texto: 'Realizado'),
               const SizedBox(width: 14),
-              _Legenda(cor: p.textoSecundario, texto: 'Planejado', contorno: true),
+              _Legenda(
+                  cor: p.textoSecundario, texto: 'Planejado', contorno: true),
             ],
           ),
         ],
@@ -1788,7 +2150,8 @@ class _GraficoSemanasState extends State<_GraficoSemanas> {
 }
 
 class _Legenda extends StatelessWidget {
-  const _Legenda({required this.cor, required this.texto, this.contorno = false});
+  const _Legenda(
+      {required this.cor, required this.texto, this.contorno = false});
 
   final Color cor;
   final String texto;
@@ -1818,7 +2181,8 @@ class _Legenda extends StatelessWidget {
 
 /// Anel de progresso.
 class _Anel extends StatelessWidget {
-  const _Anel({required this.valor, required this.tamanho, required this.centro});
+  const _Anel(
+      {required this.valor, required this.tamanho, required this.centro});
 
   final double valor;
   final double tamanho;
@@ -1859,7 +2223,8 @@ class _AnelPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(r, 0, math.pi * 2, false, base..color = trilho);
     if (v > 0) {
-      canvas.drawArc(r, -math.pi / 2, math.pi * 2 * v, false, base..color = _destaque);
+      canvas.drawArc(
+          r, -math.pi / 2, math.pi * 2 * v, false, base..color = _destaque);
     }
   }
 
@@ -1879,6 +2244,7 @@ class _AlunoInicio extends StatelessWidget {
     required this.onExecutar,
     required this.onVerFeedbacks,
     required this.onVerTreinos,
+    required this.onContratar,
   });
 
   final DadosAluno dados;
@@ -1886,6 +2252,7 @@ class _AlunoInicio extends StatelessWidget {
   final ValueChanged<TreinoPlano> onExecutar;
   final VoidCallback onVerFeedbacks;
   final VoidCallback onVerTreinos;
+  final VoidCallback onContratar;
 
   @override
   Widget build(BuildContext context) {
@@ -1893,11 +2260,13 @@ class _AlunoInicio extends StatelessWidget {
     final hoje = DateTime.now();
     final segunda = _segunda(hoje);
     final daSemana = dados.treinos
-        .where((t) => !t.data.isBefore(segunda) &&
+        .where((t) =>
+            !t.data.isBefore(segunda) &&
             t.data.isBefore(segunda.add(const Duration(days: 7))))
         .toList();
     final feitos = daSemana.where((t) => t.concluido).toList();
-    final kmFeitos = feitos.fold<double>(0, (s, t) => s + (t.realizadoKm ?? t.distanciaKm ?? 0));
+    final kmFeitos = feitos.fold<double>(
+        0, (s, t) => s + (t.realizadoKm ?? t.distanciaKm ?? 0));
     final meta = dados.metaKmSemana > 0
         ? dados.metaKmSemana
         : daSemana.fold<double>(0, (s, t) => s + (t.distanciaKm ?? 0));
@@ -1906,22 +2275,35 @@ class _AlunoInicio extends StatelessWidget {
         .where((t) => _soData(t.data).isAfter(_soData(hoje)))
         .take(3)
         .toList();
-    final ultimoFeedback = dados.feedbacks.isEmpty ? null : dados.feedbacks.first;
+    final ultimoFeedback =
+        dados.feedbacks.isEmpty ? null : dados.feedbacks.first;
 
     return _Rolagem(children: [
+      // ----- Sem personal: convite para contratar -----
+      if (dados.semPersonal) ...[
+        if (dados.contratacao != null)
+          _CardPedidoEnviado(contratacao: dados.contratacao!)
+        else
+          _CardContratar(onTap: onContratar),
+        const SizedBox(height: 14),
+      ],
+
       // ----- Treino do dia -----
       if (doDia.isEmpty)
-        const _Vazio(
+        _Vazio(
           icone: Icons.self_improvement_rounded,
           titulo: 'Sem treino para hoje',
-          texto: 'Aproveite para descansar. Os próximos treinos estão abaixo.',
+          texto: dados.semPersonal && dados.treinos.isEmpty
+              ? 'Com um personal, seus treinos programados aparecem aqui.'
+              : 'Aproveite para descansar. Os próximos treinos estão abaixo.',
         )
       else
-        for (final t in doDia) _CardTreinoDoDia(
-          treino: t,
-          onDetalhe: () => onDetalhe(t),
-          onExecutar: () => onExecutar(t),
-        ),
+        for (final t in doDia)
+          _CardTreinoDoDia(
+            treino: t,
+            onDetalhe: () => onDetalhe(t),
+            onExecutar: () => onExecutar(t),
+          ),
 
       // ----- Progresso semanal -----
       const _Titulo('Progresso da semana'),
@@ -1951,7 +2333,9 @@ class _AlunoInicio extends StatelessWidget {
                 children: [
                   Text(meta > 0 ? 'Meta: ${_km(meta)} km' : 'Sem meta definida',
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800, color: p.texto)),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: p.texto)),
                   const SizedBox(height: 4),
                   Text('${feitos.length} de ${daSemana.length} treinos feitos',
                       style: TextStyle(fontSize: 13, color: p.textoSecundario)),
@@ -1991,13 +2375,15 @@ class _AlunoInicio extends StatelessWidget {
         Text('Nenhum treino programado ainda.',
             style: TextStyle(fontSize: 13, color: p.textoSecundario))
       else
-        for (final t in proximos) _LinhaTreino(treino: t, onTap: () => onDetalhe(t)),
+        for (final t in proximos)
+          _LinhaTreino(treino: t, onTap: () => onDetalhe(t)),
     ]);
   }
 }
 
 class _PontoDia extends StatelessWidget {
-  const _PontoDia({required this.letra, required this.treinos, required this.hoje});
+  const _PontoDia(
+      {required this.letra, required this.treinos, required this.hoje});
 
   final String letra;
   final List<TreinoPlano> treinos;
@@ -2019,7 +2405,9 @@ class _PontoDia extends StatelessWidget {
         Container(
           height: 8,
           decoration: BoxDecoration(
-            color: feito ? _destaque : (tem ? p.textoSecundario.withValues(alpha: 0.35) : p.cinza),
+            color: feito
+                ? _destaque
+                : (tem ? p.textoSecundario.withValues(alpha: 0.35) : p.cinza),
             borderRadius: BorderRadius.circular(4),
           ),
         ),
@@ -2056,7 +2444,8 @@ class _CardTreinoDoDia extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: _destaque,
                   borderRadius: BorderRadius.circular(20),
@@ -2098,10 +2487,13 @@ class _CardTreinoDoDia extends StatelessWidget {
             children: [
               _MetricaClara(
                   rotulo: 'Distância',
-                  valor: t.distanciaKm != null ? '${_km(t.distanciaKm!)} km' : '—'),
+                  valor: t.distanciaKm != null
+                      ? '${_km(t.distanciaKm!)} km'
+                      : '—'),
               _MetricaClara(
                   rotulo: 'Ritmo',
-                  valor: t.ritmoAlvo != null ? '${_pace(t.ritmoAlvo!)}/km' : '—'),
+                  valor:
+                      t.ritmoAlvo != null ? '${_pace(t.ritmoAlvo!)}/km' : '—'),
               _MetricaClara(
                   rotulo: 'Duração',
                   valor: t.duracaoMin != null ? '${t.duracaoMin} min' : '—'),
@@ -2115,7 +2507,8 @@ class _CardTreinoDoDia extends StatelessWidget {
                   onPressed: onDetalhe,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+                    side:
+                        BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                     minimumSize: const Size(0, 48),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
@@ -2172,7 +2565,9 @@ class _MetricaClara extends StatelessWidget {
           const SizedBox(height: 2),
           Text(valor,
               style: const TextStyle(
-                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -2202,9 +2597,14 @@ class _AlunoTreinosState extends State<_AlunoTreinos> {
     final fimSemana = _segunda(hoje).add(const Duration(days: 7));
     final todos = widget.dados.treinos;
     final lista = switch (_filtro) {
-      0 => todos.where((t) => _soData(t.data).isBefore(hoje)).toList().reversed.toList(),
+      0 => todos
+          .where((t) => _soData(t.data).isBefore(hoje))
+          .toList()
+          .reversed
+          .toList(),
       1 => todos
-          .where((t) => !_soData(t.data).isBefore(hoje) && t.data.isBefore(fimSemana))
+          .where((t) =>
+              !_soData(t.data).isBefore(hoje) && t.data.isBefore(fimSemana))
           .toList(),
       _ => todos.where((t) => !t.data.isBefore(fimSemana)).toList(),
     };
@@ -2232,7 +2632,8 @@ class _AlunoTreinosState extends State<_AlunoTreinos> {
 }
 
 class _Segmentos extends StatelessWidget {
-  const _Segmentos({required this.opcoes, required this.atual, required this.onMudar});
+  const _Segmentos(
+      {required this.opcoes, required this.atual, required this.onMudar});
 
   final List<String> opcoes;
   final int atual;
@@ -2263,14 +2664,20 @@ class _Segmentos extends StatelessWidget {
                     color: i == atual ? p.card : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: i == atual
-                        ? [BoxShadow(color: p.sombra, blurRadius: 8, offset: const Offset(0, 2))]
+                        ? [
+                            BoxShadow(
+                                color: p.sombra,
+                                blurRadius: 8,
+                                offset: const Offset(0, 2))
+                          ]
                         : null,
                   ),
                   child: Text(opcoes[i],
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight: i == atual ? FontWeight.w800 : FontWeight.w600,
+                          fontWeight:
+                              i == atual ? FontWeight.w800 : FontWeight.w600,
                           color: i == atual ? p.texto : p.textoSecundario)),
                 ),
               ),
@@ -2296,7 +2703,8 @@ class _AlunoEvolucao extends StatelessWidget {
     final p = _Paleta.of(context);
     final feitos = dados.treinos.where((t) => t.concluido).toList();
     final passados = dados.treinos
-        .where((t) => _soData(t.data).isBefore(_soData(DateTime.now())) || t.concluido)
+        .where((t) =>
+            _soData(t.data).isBefore(_soData(DateTime.now())) || t.concluido)
         .toList();
     final km = feitos.fold<double>(0, (s, t) => s + (t.realizadoKm ?? 0));
     final paces = feitos.map((t) => t.paceReal).whereType<double>().toList();
@@ -2328,7 +2736,8 @@ class _AlunoEvolucao extends StatelessWidget {
           Expanded(
             child: _Numero(
               icone: Icons.task_alt_rounded,
-              valor: cumprimento != null ? '${(cumprimento * 100).round()}%' : '—',
+              valor:
+                  cumprimento != null ? '${(cumprimento * 100).round()}%' : '—',
               rotulo: 'treinos cumpridos',
             ),
           ),
@@ -2346,7 +2755,8 @@ class _AlunoEvolucao extends StatelessWidget {
           texto: 'Conclua um treino para ver distância, ritmo e evolução.',
         )
       else
-        for (final t in feitos.reversed) _LinhaHistorico(treino: t, onTap: () => onDetalhe(t)),
+        for (final t in feitos.reversed)
+          _LinhaHistorico(treino: t, onTap: () => onDetalhe(t)),
     ]);
   }
 }
@@ -2380,7 +2790,9 @@ class _LinhaHistorico extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w800, color: p.texto)),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: p.texto)),
                 ),
                 Text(_dataLonga(t.data),
                     style: TextStyle(fontSize: 12, color: p.textoSecundario)),
@@ -2389,7 +2801,9 @@ class _LinhaHistorico extends StatelessWidget {
             if (t.alunoNome != null)
               Text(t.alunoNome!,
                   style: TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w600, color: p.verde)),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: p.verde)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -2400,10 +2814,14 @@ class _LinhaHistorico extends StatelessWidget {
                 _Comparacao(
                     rotulo: 'Ritmo',
                     real: t.paceReal != null ? '${_pace(t.paceReal!)}/km' : '—',
-                    plano: t.ritmoAlvo != null ? '${_pace(t.ritmoAlvo!)}/km' : null),
+                    plano: t.ritmoAlvo != null
+                        ? '${_pace(t.ritmoAlvo!)}/km'
+                        : null),
                 _Comparacao(
                     rotulo: 'Tempo',
-                    real: t.realizadoSeg != null ? _duracao(t.realizadoSeg!) : '—',
+                    real: t.realizadoSeg != null
+                        ? _duracao(t.realizadoSeg!)
+                        : '—',
                     plano: t.duracaoMin != null ? '${t.duracaoMin} min' : null),
               ],
             ),
@@ -2491,7 +2909,9 @@ class _ListaFeedbacks extends StatelessWidget {
       if (feedbacks.isEmpty)
         _Vazio(
           icone: Icons.forum_outlined,
-          titulo: visaoTreinador ? 'Nenhum feedback enviado' : 'Nenhum feedback ainda',
+          titulo: visaoTreinador
+              ? 'Nenhum feedback enviado'
+              : 'Nenhum feedback ainda',
           texto: visaoTreinador
               ? 'Comentários e orientações que você enviar aparecem aqui.'
               : 'Comentários e orientações do seu treinador aparecem aqui.',
@@ -2502,7 +2922,8 @@ class _ListaFeedbacks extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
               onTap: onTocar == null ? null : () => onTocar!(f),
-              child: _BalaoFeedback(feedback: f, visaoTreinador: visaoTreinador),
+              child:
+                  _BalaoFeedback(feedback: f, visaoTreinador: visaoTreinador),
             ),
           ),
     ]);
@@ -2535,7 +2956,8 @@ class _BalaoFeedback extends StatelessWidget {
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
-        border: Border.all(color: novo ? _destaque : p.borda, width: novo ? 1.5 : 1),
+        border: Border.all(
+            color: novo ? _destaque : p.borda, width: novo ? 1.5 : 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2546,24 +2968,31 @@ class _BalaoFeedback extends StatelessWidget {
                 radius: 16,
                 backgroundColor: p.superficie,
                 child: Text(
-                  _iniciais(visaoTreinador ? (f.alunoNome ?? '?') : (f.autor ?? 'T')),
+                  _iniciais(
+                      visaoTreinador ? (f.alunoNome ?? '?') : (f.autor ?? 'T')),
                   style: const TextStyle(
-                      color: _destaque, fontSize: 11, fontWeight: FontWeight.w800),
+                      color: _destaque,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(quem,
                     style: TextStyle(
-                        fontSize: 13.5, fontWeight: FontWeight.w800, color: p.texto)),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: p.texto)),
               ),
               if (f.pendenteEnvio)
-                Icon(Icons.cloud_upload_outlined, size: 16, color: p.textoSecundario)
+                Icon(Icons.cloud_upload_outlined,
+                    size: 16, color: p.textoSecundario)
               else if (novo)
                 Container(
                   width: 9,
                   height: 9,
-                  decoration: const BoxDecoration(color: _vermelho, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                      color: _vermelho, shape: BoxShape.circle),
                 ),
               const SizedBox(width: 6),
               Text(_dataLonga(f.data),
@@ -2574,10 +3003,13 @@ class _BalaoFeedback extends StatelessWidget {
             const SizedBox(height: 8),
             Text('Sobre: ${f.treinoTitulo}',
                 style: TextStyle(
-                    fontSize: 11.5, fontWeight: FontWeight.w700, color: p.verde)),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: p.verde)),
           ],
           const SizedBox(height: 6),
-          Text(f.texto, style: TextStyle(fontSize: 14, height: 1.45, color: p.texto)),
+          Text(f.texto,
+              style: TextStyle(fontSize: 14, height: 1.45, color: p.texto)),
         ],
       ),
     );
@@ -2621,7 +3053,8 @@ class _BotaoGrande extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         fontSize: 14.5)),
               ),
-              const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              const Icon(Icons.arrow_forward_rounded,
+                  color: Colors.white, size: 18),
             ],
           ),
         ),
@@ -2635,10 +3068,15 @@ class _BotaoGrande extends StatelessWidget {
 // =============================================================================
 
 class _AlunoPerfil extends StatelessWidget {
-  const _AlunoPerfil({required this.dados, required this.onEditar});
+  const _AlunoPerfil({
+    required this.dados,
+    required this.onEditar,
+    required this.onContratar,
+  });
 
   final DadosAluno dados;
   final VoidCallback onEditar;
+  final VoidCallback onContratar;
 
   @override
   Widget build(BuildContext context) {
@@ -2665,7 +3103,9 @@ class _AlunoPerfil extends StatelessWidget {
               ),
               child: Text(_iniciais(nome),
                   style: const TextStyle(
-                      color: _destaque, fontSize: 22, fontWeight: FontWeight.w900)),
+                      color: _destaque,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900)),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -2674,10 +3114,13 @@ class _AlunoPerfil extends StatelessWidget {
                 children: [
                   Text(nome,
                       style: TextStyle(
-                          fontSize: 19, fontWeight: FontWeight.w800, color: p.texto)),
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: p.texto)),
                   if (perfil.nivel != null)
                     Text(perfil.nivel!,
-                        style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                        style:
+                            TextStyle(fontSize: 13, color: p.textoSecundario)),
                   if (pendente)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -2698,19 +3141,38 @@ class _AlunoPerfil extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            _LinhaInfo(icone: Icons.alternate_email_rounded, rotulo: 'E-mail',
+            _LinhaInfo(
+                icone: Icons.alternate_email_rounded,
+                rotulo: 'E-mail',
                 valor: perfil.email ?? u?.email ?? '—'),
-            _LinhaInfo(icone: Icons.phone_outlined, rotulo: 'Telefone',
+            _LinhaInfo(
+                icone: Icons.phone_outlined,
+                rotulo: 'Telefone',
                 valor: perfil.telefone ?? '—'),
-            _LinhaInfo(icone: Icons.flag_outlined, rotulo: 'Objetivo',
+            _LinhaInfo(
+                icone: Icons.flag_outlined,
+                rotulo: 'Objetivo',
                 valor: perfil.objetivo ?? '—'),
-            _LinhaInfo(icone: Icons.sports_rounded, rotulo: 'Treinador',
-                valor: perfil.treinador ?? '—', ultima: true),
+            _LinhaInfo(
+                icone: Icons.sports_rounded,
+                rotulo: 'Treinador',
+                valor: perfil.treinador ?? '—',
+                ultima: true),
           ],
         ),
       ),
       const SizedBox(height: 16),
-      _BotaoGrande(icone: Icons.edit_rounded, texto: 'Editar informações', onTap: onEditar),
+      _BotaoGrande(
+          icone: Icons.edit_rounded,
+          texto: 'Editar informações',
+          onTap: onEditar),
+      if (dados.semPersonal) ...[
+        const _Titulo('Personal trainer'),
+        if (dados.contratacao != null)
+          _CardPedidoEnviado(contratacao: dados.contratacao!)
+        else
+          _CardContratar(onTap: onContratar),
+      ],
     ]);
   }
 }
@@ -2748,7 +3210,8 @@ class _LinhaInfo extends StatelessWidget {
             child: Icon(icone, size: 17, color: p.corSobreSuave),
           ),
           const SizedBox(width: 12),
-          Text(rotulo, style: TextStyle(fontSize: 13.5, color: p.textoSecundario)),
+          Text(rotulo,
+              style: TextStyle(fontSize: 13.5, color: p.textoSecundario)),
           const SizedBox(width: 12),
           Expanded(
             child: Text(valor,
@@ -2775,6 +3238,7 @@ class _TreinadorDashboard extends StatelessWidget {
     required this.onAluno,
     required this.onVerAgenda,
     required this.onVerAvisos,
+    required this.onResponderPedido,
   });
 
   final DadosTreinador dados;
@@ -2782,6 +3246,7 @@ class _TreinadorDashboard extends StatelessWidget {
   final ValueChanged<AlunoResumo> onAluno;
   final VoidCallback onVerAgenda;
   final VoidCallback onVerAvisos;
+  final void Function(PedidoContratacao pedido, bool aceitar) onResponderPedido;
 
   @override
   Widget build(BuildContext context) {
@@ -2789,15 +3254,53 @@ class _TreinadorDashboard extends StatelessWidget {
     final hoje = DateTime.now();
     final segunda = _segunda(hoje);
     final semana = dados.agenda
-        .where((t) => !t.data.isBefore(segunda) &&
+        .where((t) =>
+            !t.data.isBefore(segunda) &&
             t.data.isBefore(segunda.add(const Duration(days: 7))))
         .toList();
     final concluidos = semana.where((t) => t.concluido).length;
-    final ateHoje = semana.where((t) => !_soData(t.data).isAfter(_soData(hoje))).length;
+    final ateHoje =
+        semana.where((t) => !_soData(t.data).isAfter(_soData(hoje))).length;
     final doDia = dados.agenda.where((t) => _mesmoDia(t.data, hoje)).toList();
     final atencao = dados.alunos.where((a) => a.frequencia < 0.5).toList();
 
     return _Rolagem(children: [
+      // ----- Pedidos de novos alunos (contratação) -----
+      if (dados.pedidos.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('Pedidos de novos alunos',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: p.texto)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _vermelho,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('${dados.pedidos.length}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+        for (final pedido in dados.pedidos)
+          _CardPedido(
+            pedido: pedido,
+            onAceitar: () => onResponderPedido(pedido, true),
+            onRecusar: () => onResponderPedido(pedido, false),
+          ),
+        const SizedBox(height: 12),
+      ],
       Row(
         children: [
           Expanded(
@@ -2846,13 +3349,17 @@ class _TreinadorDashboard extends StatelessWidget {
                 children: [
                   Text('Taxa de conclusão',
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800, color: p.texto)),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: p.texto)),
                   const SizedBox(height: 4),
                   Text(
                       '$concluidos de $ateHoje treinos programados até hoje '
                       'nesta semana foram feitos.',
                       style: TextStyle(
-                          fontSize: 12.5, height: 1.4, color: p.textoSecundario)),
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: p.textoSecundario)),
                 ],
               ),
             ),
@@ -2865,7 +3372,8 @@ class _TreinadorDashboard extends StatelessWidget {
             style: TextStyle(fontSize: 13, color: p.textoSecundario))
       else
         for (final t in doDia)
-          _LinhaTreino(treino: t, mostrarAluno: true, onTap: () => onDetalhe(t)),
+          _LinhaTreino(
+              treino: t, mostrarAluno: true, onTap: () => onDetalhe(t)),
       if (atencao.isNotEmpty) ...[
         const _Titulo('Precisam de atenção'),
         for (final a in atencao) _CardAluno(aluno: a, onTap: () => onAluno(a)),
@@ -2913,13 +3421,16 @@ class _TreinadorAlunosState extends State<_TreinadorAlunos> {
       if (lista.isEmpty)
         _Vazio(
           icone: Icons.group_off_rounded,
-          titulo: widget.dados.alunos.isEmpty ? 'Nenhum aluno ainda' : 'Nenhum resultado',
+          titulo: widget.dados.alunos.isEmpty
+              ? 'Nenhum aluno ainda'
+              : 'Nenhum resultado',
           texto: widget.dados.alunos.isEmpty
               ? 'Os alunos vinculados a você aparecem aqui.'
               : 'Tente outro nome.',
         )
       else
-        for (final a in lista) _CardAluno(aluno: a, onTap: () => widget.onAluno(a)),
+        for (final a in lista)
+          _CardAluno(aluno: a, onTap: () => widget.onAluno(a)),
     ]);
   }
 }
@@ -2950,7 +3461,9 @@ class _CardAluno extends StatelessWidget {
               backgroundColor: p.superficie,
               child: Text(_iniciais(a.nome),
                   style: const TextStyle(
-                      color: _destaque, fontWeight: FontWeight.w800, fontSize: 14)),
+                      color: _destaque,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -2961,7 +3474,9 @@ class _CardAluno extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w800, color: p.texto)),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: p.texto)),
                   Text(
                     [
                       if (a.nivel != null) a.nivel!,
@@ -3055,8 +3570,9 @@ class _PerfilAlunoTelaState extends State<_PerfilAlunoTela> {
             .whereType<SemanaPlano>()
             .toList()
           ..sort((a, b) => a.inicio.compareTo(b.inicio));
-        _info = PerfilAlunoInfo.fromJson(
-            j['perfil'] is Map<String, dynamic> ? j['perfil'] as Map<String, dynamic> : null);
+        _info = PerfilAlunoInfo.fromJson(j['perfil'] is Map<String, dynamic>
+            ? j['perfil'] as Map<String, dynamic>
+            : null);
       }
     });
   }
@@ -3121,13 +3637,17 @@ class _PerfilAlunoTelaState extends State<_PerfilAlunoTela> {
                     ),
                     child: Text(_iniciais(a.nome),
                         style: const TextStyle(
-                            color: _destaque, fontSize: 26, fontWeight: FontWeight.w900)),
+                            color: _destaque,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900)),
                   ),
                   const SizedBox(height: 10),
                   Text(a.nome,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w800, color: p.heroiTexto)),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: p.heroiTexto)),
                   Text(
                     [
                       if (a.nivel != null) a.nivel!,
@@ -3151,7 +3671,8 @@ class _PerfilAlunoTelaState extends State<_PerfilAlunoTela> {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text('Sem conexão. $_erro',
-                                style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                                style: TextStyle(
+                                    fontSize: 12.5, color: p.textoSecundario)),
                           ),
                         Row(
                           children: [
@@ -3175,7 +3696,8 @@ class _PerfilAlunoTelaState extends State<_PerfilAlunoTela> {
                             Expanded(
                               child: _Numero(
                                 icone: Icons.speed_rounded,
-                                valor: paceMedio != null ? _pace(paceMedio) : '—',
+                                valor:
+                                    paceMedio != null ? _pace(paceMedio) : '—',
                                 rotulo: 'ritmo médio',
                               ),
                             ),
@@ -3219,7 +3741,8 @@ class _PerfilAlunoTelaState extends State<_PerfilAlunoTela> {
                                 ? _LinhaHistorico(
                                     treino: t, onTap: () => widget.onDetalhe(t))
                                 : _LinhaTreino(
-                                    treino: t, onTap: () => widget.onDetalhe(t)),
+                                    treino: t,
+                                    onTap: () => widget.onDetalhe(t)),
                       ]),
                     ),
             ),
@@ -3255,7 +3778,8 @@ class _BotaoAcao extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: destacado ? _destaque : p.superficie,
           foregroundColor: destacado ? _tinta : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
@@ -3342,7 +3866,9 @@ class _TreinadorAgendaState extends State<_TreinadorAgenda> {
                       color: sel ? p.superficie : p.card,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                          color: hoje && !sel ? _destaque : (sel ? p.superficie : p.borda),
+                          color: hoje && !sel
+                              ? _destaque
+                              : (sel ? p.superficie : p.borda),
                           width: hoje && !sel ? 1.5 : 1),
                     ),
                     child: Column(
@@ -3351,7 +3877,9 @@ class _TreinadorAgendaState extends State<_TreinadorAgenda> {
                             style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w800,
-                                color: sel ? const Color(0xFF9CA3AF) : p.textoSecundario)),
+                                color: sel
+                                    ? const Color(0xFF9CA3AF)
+                                    : p.textoSecundario)),
                         const SizedBox(height: 2),
                         Text('${d.day}',
                             style: TextStyle(
@@ -3365,7 +3893,9 @@ class _TreinadorAgendaState extends State<_TreinadorAgenda> {
                           decoration: BoxDecoration(
                             color: qtd == 0
                                 ? Colors.transparent
-                                : (sel ? _destaque : p.textoSecundario.withValues(alpha: 0.5)),
+                                : (sel
+                                    ? _destaque
+                                    : p.textoSecundario.withValues(alpha: 0.5)),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -3384,14 +3914,15 @@ class _TreinadorAgendaState extends State<_TreinadorAgenda> {
         onAcao: () => widget.onCriar(_dia),
       ),
       if (doDia.isEmpty)
-        _Vazio(
+        const _Vazio(
           icone: Icons.event_available_rounded,
           titulo: 'Dia livre',
           texto: 'Nenhum treino programado. Toque em "+ Adicionar" para criar.',
         )
       else
         for (final t in doDia)
-          _LinhaTreino(treino: t, mostrarAluno: true, onTap: () => widget.onDetalhe(t)),
+          _LinhaTreino(
+              treino: t, mostrarAluno: true, onTap: () => widget.onDetalhe(t)),
     ]);
   }
 }
@@ -3412,7 +3943,13 @@ class _TreinadorDesempenho extends StatelessWidget {
     final hoje = _soData(DateTime.now());
 
     // Por aluno: km planejado x realizado nos treinos que já passaram.
-    final linhas = <({AlunoResumo aluno, double plano, double real, int feitos, int total})>[];
+    final linhas = <({
+      AlunoResumo aluno,
+      double plano,
+      double real,
+      int feitos,
+      int total
+    })>[];
     for (final a in dados.alunos) {
       final passados = dados.agenda
           .where((t) => t.alunoId == a.id && !_soData(t.data).isAfter(hoje))
@@ -3426,8 +3963,7 @@ class _TreinadorDesempenho extends StatelessWidget {
         total: passados.length,
       ));
     }
-    linhas.sort((x, y) =>
-        (y.feitos / y.total).compareTo(x.feitos / x.total));
+    linhas.sort((x, y) => (y.feitos / y.total).compareTo(x.feitos / x.total));
 
     return _Rolagem(children: [
       if (dados.desempenho.isNotEmpty) ...[
@@ -3503,7 +4039,8 @@ class _BarraComparada extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(7),
                   border: Border.all(
-                      color: p.textoSecundario.withValues(alpha: 0.5), width: 1.2),
+                      color: p.textoSecundario.withValues(alpha: 0.5),
+                      width: 1.2),
                 ),
               ),
               TweenAnimationBuilder<double>(
@@ -3566,7 +4103,11 @@ class _LinhaAviso extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = _Paleta.of(context);
     final (icone, fundo, cor) = switch (aviso.tipo.toLowerCase()) {
-      'concluido' => (Icons.check_circle_rounded, p.destaqueSuave, p.corSobreSuave),
+      'concluido' => (
+          Icons.check_circle_rounded,
+          p.destaqueSuave,
+          p.corSobreSuave
+        ),
       'perdido' => (Icons.event_busy_rounded, p.vermelhoSuave, _vermelho),
       'feedback' => (Icons.chat_bubble_rounded, p.cinza, p.texto),
       _ => (Icons.info_outline_rounded, p.laranjaSuave, _laranja),
@@ -3603,13 +4144,1350 @@ class _LinhaAviso extends StatelessWidget {
                           fontSize: 13.5, height: 1.4, color: p.texto)),
                   const SizedBox(height: 4),
                   Text(_dataLonga(aviso.data),
-                      style: TextStyle(fontSize: 11.5, color: p.textoSecundario)),
+                      style:
+                          TextStyle(fontSize: 11.5, color: p.textoSecundario)),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// =============================================================================
+// CONTRATAR PERSONAL — cartões (aluno) e pedidos (treinador)
+// =============================================================================
+
+/// Convite para o aluno sem personal.
+class _CardContratar extends StatelessWidget {
+  const _CardContratar({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    return Material(
+      color: p.superficie,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -40,
+              top: -40,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _destaque.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: _destaque,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.sports_rounded,
+                            color: _tinta, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text('PERSONAL TRAINER',
+                            style: TextStyle(
+                                color: _destaque,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.3)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Treine com um personal',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  for (final item in const [
+                    'Plano feito para o seu objetivo',
+                    'Ajustes toda semana conforme sua evolução',
+                    'Feedback e conversa direto pelo app',
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded,
+                              size: 16, color: _destaque),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(item,
+                                style: const TextStyle(
+                                    color: Color(0xFFD1D5DB), fontSize: 13.5)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton.icon(
+                      onPressed: onTap,
+                      icon: const Icon(Icons.search_rounded, size: 20),
+                      label: const Text('Encontrar meu personal',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _destaque,
+                        foregroundColor: _tinta,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Aluno já pediu: mostra que está aguardando a resposta.
+class _CardPedidoEnviado extends StatelessWidget {
+  const _CardPedidoEnviado({required this.contratacao});
+
+  final ContratacaoPendente contratacao;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final c = contratacao;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.laranjaSuave,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _laranja.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _laranja,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.hourglass_top_rounded,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('PEDIDO ENVIADO',
+                    style: TextStyle(
+                        color: _laranja,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1)),
+                const SizedBox(height: 2),
+                Text('Aguardando ${c.personalNome}',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: p.texto)),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    if (c.planoNome != null) 'Plano ${c.planoNome}',
+                    if (c.data != null)
+                      'enviado ${_dataLonga(c.data!).toLowerCase()}',
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pedido de novo aluno, na visão do treinador.
+class _CardPedido extends StatelessWidget {
+  const _CardPedido({
+    required this.pedido,
+    required this.onAceitar,
+    required this.onRecusar,
+  });
+
+  final PedidoContratacao pedido;
+  final VoidCallback onAceitar;
+  final VoidCallback onRecusar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final x = pedido;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _destaque, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: _destaque.withValues(alpha: p.escuro ? 0.08 : 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _AvatarIniciais(nome: x.alunoNome, tamanho: 46),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(x.alunoNome,
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: p.texto)),
+                      Text(
+                        [
+                          if (x.nivel != null) x.nivel!,
+                          if (x.plano != null) 'Plano ${x.plano}',
+                          if (x.data != null) _dataLonga(x.data!),
+                        ].join(' · '),
+                        style:
+                            TextStyle(fontSize: 12, color: p.textoSecundario),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (x.objetivo != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.flag_rounded, size: 16, color: p.verde),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(x.objetivo!,
+                        style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: p.texto)),
+                  ),
+                ],
+              ),
+            ],
+            if (x.mensagem != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: p.cinza,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+                ),
+                child: Text('“${x.mensagem}”',
+                    style:
+                        TextStyle(fontSize: 13, height: 1.4, color: p.texto)),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onRecusar,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.texto,
+                      side: BorderSide(color: p.borda),
+                      minimumSize: const Size(0, 46),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Recusar',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: onAceitar,
+                    icon: const Icon(Icons.check_rounded, size: 19),
+                    label: const Text('Aceitar aluno',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _destaque,
+                      foregroundColor: _tinta,
+                      minimumSize: const Size(0, 46),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarIniciais extends StatelessWidget {
+  const _AvatarIniciais({required this.nome, this.tamanho = 48});
+
+  final String nome;
+  final double tamanho;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    return Container(
+      width: tamanho,
+      height: tamanho,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: p.escuro ? const Color(0xFF23271E) : _tinta,
+        shape: BoxShape.circle,
+        border: Border.all(color: _destaque, width: tamanho > 60 ? 3 : 2),
+      ),
+      child: Text(_iniciais(nome),
+          style: TextStyle(
+              color: _destaque,
+              fontSize: tamanho * 0.34,
+              fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
+/// ★ 4,9 (87)
+class _Nota extends StatelessWidget {
+  const _Nota(
+      {required this.nota, required this.avaliacoes, this.claro = false});
+
+  final double nota;
+  final int avaliacoes;
+  final bool claro;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, size: 16, color: Color(0xFFF5B301)),
+        const SizedBox(width: 3),
+        Text(nota.toStringAsFixed(1).replaceAll('.', ','),
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: claro ? p.heroiTexto : p.texto)),
+        if (avaliacoes > 0)
+          Text(' ($avaliacoes)',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: claro ? p.heroiTextoSec : p.textoSecundario)),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// CONTRATAR PERSONAL — lista
+// =============================================================================
+
+class _TelaPersonais extends StatefulWidget {
+  const _TelaPersonais({this.objetivo});
+
+  /// Objetivo do aluno (já vem preenchido no pedido).
+  final String? objetivo;
+
+  @override
+  State<_TelaPersonais> createState() => _TelaPersonaisState();
+}
+
+class _TelaPersonaisState extends State<_TelaPersonais> {
+  bool _carregando = true;
+  String? _erro;
+  List<PersonalInfo> _todos = const [];
+  String _busca = '';
+  String? _especialidade; // null = todas
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  Future<void> _carregar() async {
+    final r = await _PainelApi.personais();
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _erro = r.erro;
+      _todos = r.personais;
+    });
+  }
+
+  Future<void> _abrir(PersonalInfo personal) async {
+    HapticFeedback.selectionClick();
+    final enviou = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            _TelaPersonalDetalhe(personal: personal, objetivo: widget.objetivo),
+      ),
+    );
+    if (enviou == true && mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final especialidades = <String>{
+      for (final x in _todos) ...x.especialidades,
+    }.toList()
+      ..sort();
+    final termo = _busca.trim().toLowerCase();
+    final lista = _todos.where((x) {
+      final okBusca = termo.isEmpty ||
+          x.nome.toLowerCase().contains(termo) ||
+          x.especialidades.any((e) => e.toLowerCase().contains(termo)) ||
+          (x.cidade?.toLowerCase().contains(termo) ?? false);
+      final okEsp =
+          _especialidade == null || x.especialidades.contains(_especialidade);
+      return okBusca && okEsp;
+    }).toList();
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: p.barraStatus,
+      child: Scaffold(
+        backgroundColor: p.fundo,
+        body: Column(
+          children: [
+            _TopoSimples(
+              sobre: 'CONTRATAR PERSONAL',
+              titulo: 'Encontre seu personal',
+              subtitulo: 'Compare, escolha um plano e envie seu pedido.',
+            ),
+            Expanded(
+              child: _carregando
+                  ? const _Carregando()
+                  : RefreshIndicator(
+                      color: p.texto,
+                      backgroundColor: p.card,
+                      onRefresh: _carregar,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        children: [
+                          TextField(
+                            onChanged: (v) => setState(() => _busca = v),
+                            style: TextStyle(color: p.texto),
+                            decoration: _campo(p, 'Buscar por nome, cidade...',
+                                Icons.search_rounded),
+                          ),
+                          if (especialidades.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 38,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  _Pilula(
+                                    texto: 'Todos',
+                                    ativo: _especialidade == null,
+                                    onTap: () =>
+                                        setState(() => _especialidade = null),
+                                  ),
+                                  for (final e in especialidades) ...[
+                                    const SizedBox(width: 8),
+                                    _Pilula(
+                                      texto: e,
+                                      ativo: _especialidade == e,
+                                      onTap: () => setState(() =>
+                                          _especialidade =
+                                              _especialidade == e ? null : e),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          if (_erro != null && _todos.isEmpty)
+                            _Vazio(
+                              icone: Icons.wifi_off_rounded,
+                              titulo: 'Sem conexão',
+                              texto: 'A lista de personais aparece quando a '
+                                  'internet voltar. Puxe para tentar de novo.',
+                            )
+                          else if (lista.isEmpty)
+                            _Vazio(
+                              icone: Icons.person_search_rounded,
+                              titulo: _todos.isEmpty
+                                  ? 'Nenhum personal disponível'
+                                  : 'Nenhum resultado',
+                              texto: _todos.isEmpty
+                                  ? 'Novos personais aparecem aqui em breve.'
+                                  : 'Tente outra busca ou especialidade.',
+                            )
+                          else ...[
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(left: 4, bottom: 8),
+                              child: Text(
+                                  '${lista.length} '
+                                  '${lista.length == 1 ? 'personal' : 'personais'}',
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.textoSecundario)),
+                            ),
+                            for (final x in lista)
+                              _CardPersonal(
+                                  personal: x, onTap: () => _abrir(x)),
+                          ],
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Topo com degradê e botão de voltar (telas próprias do painel).
+class _TopoSimples extends StatelessWidget {
+  const _TopoSimples({
+    required this.sobre,
+    required this.titulo,
+    this.subtitulo,
+  });
+
+  final String sobre;
+  final String titulo;
+  final String? subtitulo;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: p.heroi,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _AneisPainter(cor: p.heroiLinha)),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  16, MediaQuery.of(context).padding.top + 8, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _BotaoVidro(
+                    icone: Icons.arrow_back_ios_new_rounded,
+                    onTap: () => Navigator.maybePop(context),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(sobre,
+                      style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: p.heroiLinha,
+                          letterSpacing: 1.5)),
+                  const SizedBox(height: 2),
+                  Text(titulo,
+                      style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: p.heroiTexto,
+                          letterSpacing: -0.4)),
+                  if (subtitulo != null) ...[
+                    const SizedBox(height: 4),
+                    Text(subtitulo!,
+                        style:
+                            TextStyle(fontSize: 13.5, color: p.heroiTextoSec)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CardPersonal extends StatelessWidget {
+  const _CardPersonal({required this.personal, required this.onTap});
+
+  final PersonalInfo personal;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final x = personal;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _Cartao(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _AvatarIniciais(nome: x.nome, tamanho: 54),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(x.nome,
+                          style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              color: p.texto)),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (x.nota != null) ...[
+                            _Nota(nota: x.nota!, avaliacoes: x.avaliacoes),
+                            const SizedBox(width: 8),
+                          ],
+                          if (x.cidade != null)
+                            Flexible(
+                              child: Text(x.cidade!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 12, color: p.textoSecundario)),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+              ],
+            ),
+            if (x.especialidades.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final e in x.especialidades.take(3))
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: p.destaqueSuave,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(e,
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: p.corSobreSuave)),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            Divider(height: 1, color: p.borda),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                    x.online && !x.presencial
+                        ? Icons.videocam_outlined
+                        : Icons.place_outlined,
+                    size: 16,
+                    color: p.textoSecundario),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(x.atendimento.isEmpty ? '—' : x.atendimento,
+                      style:
+                          TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                ),
+                if (x.aPartirDe != null)
+                  Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: 'a partir de ',
+                        style: TextStyle(
+                            fontSize: 11.5, color: p.textoSecundario)),
+                    TextSpan(
+                        text: _reais(x.aPartirDe!),
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: p.texto)),
+                    TextSpan(
+                        text: '/mês',
+                        style: TextStyle(
+                            fontSize: 11.5, color: p.textoSecundario)),
+                  ])),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// CONTRATAR PERSONAL — perfil do personal + planos
+// =============================================================================
+
+class _TelaPersonalDetalhe extends StatefulWidget {
+  const _TelaPersonalDetalhe({required this.personal, this.objetivo});
+
+  final PersonalInfo personal;
+  final String? objetivo;
+
+  @override
+  State<_TelaPersonalDetalhe> createState() => _TelaPersonalDetalheState();
+}
+
+class _TelaPersonalDetalheState extends State<_TelaPersonalDetalhe> {
+  late PlanoPersonal? _plano = widget.personal.planos.isEmpty
+      ? null
+      : widget.personal.planos.firstWhere((x) => x.destaque,
+          orElse: () => widget.personal.planos.first);
+  bool _enviando = false;
+
+  Future<void> _solicitar() async {
+    final x = widget.personal;
+    final plano = _plano;
+    if (plano == null) return;
+
+    final corpo = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          _FolhaSolicitar(personal: x, plano: plano, objetivo: widget.objetivo),
+    );
+    if (corpo == null || !mounted) return;
+
+    setState(() => _enviando = true);
+    final r = await _PainelApi.contratar(corpo);
+    if (!mounted) return;
+    setState(() => _enviando = false);
+
+    final mensageiro = ScaffoldMessenger.of(context);
+    void avisar(String texto, {bool erro = false}) => mensageiro
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(texto),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: erro ? _vermelho : const Color(0xFF262A23),
+      ));
+
+    switch (r) {
+      case ResultadoEnvio.enviado:
+        avisar('Pedido enviado para ${x.nome}! Você será avisado quando '
+            'ele(a) responder.');
+        Navigator.pop(context, true);
+      case ResultadoEnvio.naFila:
+        avisar('Pedido salvo no celular. Será enviado quando houver internet.');
+        Navigator.pop(context, true);
+      case ResultadoEnvio.recusado:
+        avisar('Não foi possível enviar o pedido. Tente de novo.', erro: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final x = widget.personal;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: p.barraStatus,
+      child: Scaffold(
+        backgroundColor: p.fundo,
+        body: Column(
+          children: [
+            // ---------- Topo ----------
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: p.heroi,
+                ),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(30)),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                  16, MediaQuery.of(context).padding.top + 8, 16, 20),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _BotaoVidro(
+                        icone: Icons.arrow_back_ios_new_rounded,
+                        onTap: () => Navigator.maybePop(context),
+                      ),
+                      const Spacer(),
+                      Text('PERSONAL TRAINER',
+                          style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: p.heroiLinha,
+                              letterSpacing: 1.5)),
+                      const Spacer(),
+                      const SizedBox(width: 42),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _AvatarIniciais(nome: x.nome, tamanho: 84),
+                  const SizedBox(height: 10),
+                  Text(x.nome,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w800,
+                          color: p.heroiTexto)),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 10,
+                    children: [
+                      if (x.nota != null)
+                        _Nota(
+                            nota: x.nota!,
+                            avaliacoes: x.avaliacoes,
+                            claro: true),
+                      if (x.cref != null)
+                        Text('CREF ${x.cref}',
+                            style: TextStyle(
+                                fontSize: 12.5, color: p.heroiTextoSec)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ---------- Conteúdo ----------
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Numero(
+                          icone: Icons.groups_rounded,
+                          valor: '${x.alunos}',
+                          rotulo: 'alunos ativos',
+                          destacado: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _Numero(
+                          icone: Icons.workspace_premium_outlined,
+                          valor: x.anosExperiencia != null
+                              ? '${x.anosExperiencia}'
+                              : '—',
+                          rotulo: 'anos de experiência',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _Numero(
+                          icone: x.online && !x.presencial
+                              ? Icons.videocam_outlined
+                              : Icons.place_outlined,
+                          valor: x.online && x.presencial
+                              ? 'Ambos'
+                              : (x.presencial ? 'Local' : 'Online'),
+                          rotulo: x.cidade ?? 'atendimento',
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (x.bio != null) ...[
+                    const _Titulo('Sobre'),
+                    Text(x.bio!,
+                        style: TextStyle(
+                            fontSize: 14.5, height: 1.5, color: p.texto)),
+                  ],
+                  if (x.especialidades.isNotEmpty) ...[
+                    const _Titulo('Especialidades'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final e in x.especialidades)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: p.destaqueSuave,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(e,
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.corSobreSuave)),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const _Titulo('Escolha um plano'),
+                  if (x.planos.isEmpty)
+                    const _Vazio(
+                      icone: Icons.receipt_long_outlined,
+                      titulo: 'Sem planos no momento',
+                      texto: 'Este personal ainda não publicou planos.',
+                    )
+                  else
+                    for (final plano in x.planos)
+                      _CardPlano(
+                        plano: plano,
+                        selecionado: plano.id == _plano?.id,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _plano = plano);
+                        },
+                      ),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.verified_user_outlined,
+                          size: 16, color: p.textoSecundario),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Você só paga depois que o personal aceitar o seu '
+                          'pedido. Nada é cobrado agora.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: p.textoSecundario),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ---------- Botão fixo ----------
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                  16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+              decoration: BoxDecoration(
+                color: p.card,
+                border: Border(top: BorderSide(color: p.borda)),
+              ),
+              child: Row(
+                children: [
+                  if (_plano != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_plano!.nome,
+                              style: TextStyle(
+                                  fontSize: 12, color: p.textoSecundario)),
+                          Text('${_reais(_plano!.precoMensal)}/mês',
+                              style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: p.texto)),
+                        ],
+                      ),
+                    ),
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: FilledButton.icon(
+                        onPressed:
+                            _plano == null || _enviando ? null : _solicitar,
+                        icon: _enviando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: _tinta),
+                              )
+                            : const Icon(Icons.handshake_outlined),
+                        label: const Text('Contratar',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 15)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _destaque,
+                          foregroundColor: _tinta,
+                          disabledBackgroundColor: p.borda,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CardPlano extends StatelessWidget {
+  const _CardPlano({
+    required this.plano,
+    required this.selecionado,
+    required this.onTap,
+  });
+
+  final PlanoPersonal plano;
+  final bool selecionado;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final x = plano;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: selecionado ? p.destaqueSuave : p.card,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: selecionado ? _destaque : p.borda,
+                width: selecionado ? 2 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selecionado ? _destaque : Colors.transparent,
+                      border: Border.all(
+                          color: selecionado ? _destaque : p.textoSecundario,
+                          width: 2),
+                    ),
+                    child: selecionado
+                        ? const Icon(Icons.check_rounded,
+                            size: 14, color: _tinta)
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(x.nome,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: p.texto)),
+                        if (x.destaque) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: p.superficie,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('MAIS ESCOLHIDO',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: _destaque,
+                                    letterSpacing: 0.6)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: _reais(x.precoMensal),
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: p.texto)),
+                    TextSpan(
+                        text: '/mês',
+                        style: TextStyle(
+                            fontSize: 11.5, color: p.textoSecundario)),
+                  ])),
+                ],
+              ),
+              if (x.descricao != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 32, top: 2),
+                  child: Text(x.descricao!,
+                      style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+                ),
+              if (x.itens.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final item in x.itens)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 32, bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_rounded, size: 15, color: p.verde),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(item,
+                              style: TextStyle(fontSize: 13, color: p.texto)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Confirmação do pedido. Devolve o corpo do POST /painel/contratacoes.
+class _FolhaSolicitar extends StatefulWidget {
+  const _FolhaSolicitar({
+    required this.personal,
+    required this.plano,
+    this.objetivo,
+  });
+
+  final PersonalInfo personal;
+  final PlanoPersonal plano;
+  final String? objetivo;
+
+  @override
+  State<_FolhaSolicitar> createState() => _FolhaSolicitarState();
+}
+
+class _FolhaSolicitarState extends State<_FolhaSolicitar> {
+  late final _objetivo = TextEditingController(text: widget.objetivo ?? '');
+  final _mensagem = TextEditingController();
+  String? _erro;
+
+  @override
+  void dispose() {
+    _objetivo.dispose();
+    _mensagem.dispose();
+    super.dispose();
+  }
+
+  void _enviar() {
+    final objetivo = _objetivo.text.trim();
+    if (objetivo.length < 3) {
+      HapticFeedback.heavyImpact();
+      setState(() => _erro = 'Conte em poucas palavras qual é o seu objetivo.');
+      return;
+    }
+    final u = FirebaseAuth.instance.currentUser;
+    Navigator.pop(context, <String, dynamic>{
+      'personalId': widget.personal.id,
+      'personalNome': widget.personal.nome,
+      'planoId': widget.plano.id,
+      'planoNome': widget.plano.nome,
+      'objetivo': objetivo,
+      'mensagem': _mensagem.text.trim().isEmpty ? null : _mensagem.text.trim(),
+      'alunoNome': u?.displayName,
+      'data': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Paleta.of(context);
+    final x = widget.personal;
+    return _Folha(
+      sobre: 'PEDIDO DE CONTRATAÇÃO',
+      titulo: 'Confirmar pedido',
+      children: [
+        _Cartao(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _AvatarIniciais(nome: x.nome, tamanho: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(x.nome,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: p.texto)),
+                    Text('Plano ${widget.plano.nome}',
+                        style: TextStyle(
+                            fontSize: 12.5, color: p.textoSecundario)),
+                  ],
+                ),
+              ),
+              Text('${_reais(widget.plano.precoMensal)}/mês',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: p.texto)),
+            ],
+          ),
+        ),
+        const _Rotulo('Seu objetivo'),
+        TextField(
+          controller: _objetivo,
+          style: TextStyle(color: p.texto),
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (_) {
+            if (_erro != null) setState(() => _erro = null);
+          },
+          decoration:
+              _campo(p, 'Ex.: correr 10 km em 50 min', Icons.flag_outlined),
+        ),
+        const _Rotulo('Mensagem para o personal (opcional)'),
+        TextField(
+          controller: _mensagem,
+          style: TextStyle(color: p.texto),
+          minLines: 3,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _campo(
+              p,
+              'Rotina, dias disponíveis, lesões, experiência...',
+              Icons.chat_bubble_outline_rounded),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.borda),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (icone, texto) in const [
+                (
+                  Icons.mark_email_read_outlined,
+                  'O personal recebe seu pedido e responde pelo app.'
+                ),
+                (
+                  Icons.payments_outlined,
+                  'O pagamento só é combinado depois que ele(a) aceitar.'
+                ),
+                (
+                  Icons.event_available_outlined,
+                  'Aceito o pedido, seus treinos aparecem no seu painel.'
+                ),
+              ])
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(icone, size: 17, color: p.verde),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(texto,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.35,
+                                color: p.textoSecundario)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_erro != null) ...[
+          const SizedBox(height: 12),
+          Text(_erro!,
+              style: const TextStyle(
+                  color: _vermelho, fontWeight: FontWeight.w700, fontSize: 13)),
+        ],
+        const SizedBox(height: 18),
+        _BotaoPrincipal(
+            texto: 'Enviar pedido', icone: Icons.send_rounded, onTap: _enviar),
+      ],
     );
   }
 }
@@ -3631,7 +5509,8 @@ class _Folha extends StatelessWidget {
     final p = _Paleta.of(context);
     final teclado = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
       decoration: BoxDecoration(
         color: p.fundo,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -3665,7 +5544,9 @@ class _Folha extends StatelessWidget {
                         letterSpacing: 1.2)),
               Text(titulo,
                   style: TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.w800, color: p.texto)),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: p.texto)),
               const SizedBox(height: 16),
               ...children,
             ],
@@ -3676,7 +5557,8 @@ class _Folha extends StatelessWidget {
   }
 }
 
-InputDecoration _campo(_Paleta p, String dica, IconData icone) => InputDecoration(
+InputDecoration _campo(_Paleta p, String dica, IconData icone) =>
+    InputDecoration(
       hintText: dica,
       hintStyle: TextStyle(color: p.textoSecundario),
       prefixIcon: Icon(icone, color: p.textoSecundario, size: 20),
@@ -3709,7 +5591,9 @@ class _Rotulo extends StatelessWidget {
       padding: const EdgeInsets.only(top: 14, bottom: 6),
       child: Text(texto,
           style: TextStyle(
-              fontSize: 12.5, fontWeight: FontWeight.w700, color: p.textoSecundario)),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: p.textoSecundario)),
     );
   }
 }
@@ -3730,12 +5614,14 @@ class _BotaoPrincipal extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onTap,
         icon: Icon(icone ?? Icons.check_rounded),
-        label: Text(texto, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        label: Text(texto,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         style: FilledButton.styleFrom(
           backgroundColor: p.escuro ? _destaque : _tinta,
           foregroundColor: p.escuro ? _tinta : Colors.white,
           disabledBackgroundColor: p.borda,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
@@ -3773,7 +5659,8 @@ class _FolhaDetalhe extends StatelessWidget {
             Expanded(
               child: _Numero(
                 icone: Icons.straighten_rounded,
-                valor: t.distanciaKm != null ? '${_km(t.distanciaKm!)} km' : '—',
+                valor:
+                    t.distanciaKm != null ? '${_km(t.distanciaKm!)} km' : '—',
                 rotulo: 'distância',
                 destacado: true,
               ),
@@ -3849,7 +5736,19 @@ class _FolhaCriarTreino extends StatefulWidget {
 }
 
 class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
-  static const _tipos = ['Leve', 'Ritmo', 'Intervalado', 'Longo', 'Regenerativo'];
+  static const _tipos = [
+    'Leve',
+    'Ritmo',
+    'Intervalado',
+    'Longo',
+    'Regenerativo',
+    'Força',
+    'HIIT',
+    'Mobilidade',
+  ];
+
+  /// Tipos sem distância (só duração).
+  static const _semDistancia = {'Força', 'HIIT', 'Mobilidade'};
 
   final _titulo = TextEditingController();
   final _distancia = TextEditingController();
@@ -3882,7 +5781,8 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
   }
 
   void _salvar() {
-    final distancia = double.tryParse(_distancia.text.replaceAll(',', '.').trim());
+    final distancia =
+        double.tryParse(_distancia.text.replaceAll(',', '.').trim());
     final ritmo = _ritmo.text.trim().isEmpty ? null : _lerPace(_ritmo.text);
     final duracao = int.tryParse(_duracao.text.trim());
     final titulo = _titulo.text.trim();
@@ -3892,6 +5792,8 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
       erro = 'Escolha o aluno.';
     } else if (titulo.isEmpty) {
       erro = 'Dê um nome ao treino.';
+    } else if (_semDistancia.contains(_tipo) && duracao == null) {
+      erro = 'Informe a duração do treino.';
     } else if (distancia == null && duracao == null) {
       erro = 'Informe a distância ou a duração.';
     } else if (_ritmo.text.trim().isNotEmpty && ritmo == null) {
@@ -3908,10 +5810,12 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
       'data': _dataIso(_data),
       'titulo': titulo,
       'tipo': _tipo,
-      'distanciaKm': distancia,
-      'ritmoAlvoSegPorKm': ritmo?.round(),
+      'distanciaKm': _semDistancia.contains(_tipo) ? null : distancia,
+      'ritmoAlvoSegPorKm':
+          _semDistancia.contains(_tipo) ? null : ritmo?.round(),
       'duracaoMin': duracao,
-      'instrucoes': _instrucoes.text.trim().isEmpty ? null : _instrucoes.text.trim(),
+      'instrucoes':
+          _instrucoes.text.trim().isEmpty ? null : _instrucoes.text.trim(),
     });
   }
 
@@ -3941,11 +5845,14 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Icon(Icons.calendar_today_rounded, size: 18, color: p.textoSecundario),
+              Icon(Icons.calendar_today_rounded,
+                  size: 18, color: p.textoSecundario),
               const SizedBox(width: 10),
               Text('${_dataLonga(_data)} (${_data.day}/${_data.month})',
                   style: TextStyle(
-                      fontSize: 14.5, fontWeight: FontWeight.w700, color: p.texto)),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: p.texto)),
               const Spacer(),
               Icon(Icons.edit_calendar_rounded, size: 18, color: p.verde),
             ],
@@ -3957,7 +5864,10 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
           runSpacing: 8,
           children: [
             for (final t in _tipos)
-              _Pilula(texto: t, ativo: t == _tipo, onTap: () => setState(() => _tipo = t)),
+              _Pilula(
+                  texto: t,
+                  ativo: t == _tipo,
+                  onTap: () => setState(() => _tipo = t)),
           ],
         ),
         const _Rotulo('Nome do treino'),
@@ -3967,39 +5877,41 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
           textCapitalization: TextCapitalization.sentences,
           decoration: _campo(p, 'Ex.: Tiros de 400 m', Icons.title_rounded),
         ),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _Rotulo('Distância (km)'),
-                  TextField(
-                    controller: _distancia,
-                    style: TextStyle(color: p.texto),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: _campo(p, '6', Icons.straighten_rounded),
-                  ),
-                ],
+        if (!_semDistancia.contains(_tipo))
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Rotulo('Distância (km)'),
+                    TextField(
+                      controller: _distancia,
+                      style: TextStyle(color: p.texto),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: _campo(p, '6', Icons.straighten_rounded),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _Rotulo('Ritmo (min/km)'),
-                  TextField(
-                    controller: _ritmo,
-                    style: TextStyle(color: p.texto),
-                    keyboardType: TextInputType.datetime,
-                    decoration: _campo(p, '5:30', Icons.speed_rounded),
-                  ),
-                ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Rotulo('Ritmo (min/km)'),
+                    TextField(
+                      controller: _ritmo,
+                      style: TextStyle(color: p.texto),
+                      keyboardType: TextInputType.datetime,
+                      decoration: _campo(p, '5:30', Icons.speed_rounded),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         const _Rotulo('Duração (min)'),
         TextField(
           controller: _duracao,
@@ -4031,7 +5943,8 @@ class _FolhaCriarTreinoState extends State<_FolhaCriarTreino> {
 }
 
 class _Pilula extends StatelessWidget {
-  const _Pilula({required this.texto, required this.ativo, required this.onTap});
+  const _Pilula(
+      {required this.texto, required this.ativo, required this.onTap});
 
   final String texto;
   final bool ativo;
@@ -4097,12 +6010,14 @@ class _FolhaFeedbackState extends State<_FolhaFeedback> {
     final texto = _texto.text.trim();
     if (_alunoId == null || texto.isEmpty) {
       HapticFeedback.heavyImpact();
-      setState(() => _erro = _alunoId == null ? 'Escolha o aluno.' : 'Escreva a mensagem.');
+      setState(() => _erro =
+          _alunoId == null ? 'Escolha o aluno.' : 'Escreva a mensagem.');
       return;
     }
     Navigator.pop(context, <String, dynamic>{
       'alunoId': _alunoId,
-      'treinoId': widget.treino?.pendenteEnvio == true ? null : widget.treino?.id,
+      'treinoId':
+          widget.treino?.pendenteEnvio == true ? null : widget.treino?.id,
       'treinoTitulo': widget.treino?.titulo,
       'texto': texto,
       'data': DateTime.now().toUtc().toIso8601String(),
@@ -4113,7 +6028,9 @@ class _FolhaFeedbackState extends State<_FolhaFeedback> {
   Widget build(BuildContext context) {
     final p = _Paleta.of(context);
     return _Folha(
-      sobre: widget.treino != null ? 'SOBRE: ${widget.treino!.titulo.toUpperCase()}' : 'FEEDBACK',
+      sobre: widget.treino != null
+          ? 'SOBRE: ${widget.treino!.titulo.toUpperCase()}'
+          : 'FEEDBACK',
       titulo: 'Escrever feedback',
       children: [
         const _Rotulo('Para'),
@@ -4147,18 +6064,24 @@ class _FolhaFeedbackState extends State<_FolhaFeedback> {
             for (final s in _sugestoes)
               GestureDetector(
                 onTap: () {
-                  _texto.text = _texto.text.trim().isEmpty ? s : '${_texto.text.trim()} $s';
-                  _texto.selection = TextSelection.collapsed(offset: _texto.text.length);
+                  _texto.text = _texto.text.trim().isEmpty
+                      ? s
+                      : '${_texto.text.trim()} $s';
+                  _texto.selection =
+                      TextSelection.collapsed(offset: _texto.text.length);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
                     color: p.destaqueSuave,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(s,
                       style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600, color: p.corSobreSuave)),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: p.corSobreSuave)),
                 ),
               ),
           ],
@@ -4170,7 +6093,8 @@ class _FolhaFeedbackState extends State<_FolhaFeedback> {
                   color: _vermelho, fontWeight: FontWeight.w700, fontSize: 13)),
         ],
         const SizedBox(height: 18),
-        _BotaoPrincipal(texto: 'Enviar', icone: Icons.send_rounded, onTap: _enviar),
+        _BotaoPrincipal(
+            texto: 'Enviar', icone: Icons.send_rounded, onTap: _enviar),
       ],
     );
   }
@@ -4188,10 +6112,12 @@ class _FolhaEditarPerfil extends StatefulWidget {
 }
 
 class _FolhaEditarPerfilState extends State<_FolhaEditarPerfil> {
-  late final _nome =
-      TextEditingController(text: widget.perfil.nome ?? widget.nomeFirebase ?? '');
-  late final _telefone = TextEditingController(text: widget.perfil.telefone ?? '');
-  late final _objetivo = TextEditingController(text: widget.perfil.objetivo ?? '');
+  late final _nome = TextEditingController(
+      text: widget.perfil.nome ?? widget.nomeFirebase ?? '');
+  late final _telefone =
+      TextEditingController(text: widget.perfil.telefone ?? '');
+  late final _objetivo =
+      TextEditingController(text: widget.perfil.objetivo ?? '');
   String? _erro;
 
   @override
@@ -4241,7 +6167,8 @@ class _FolhaEditarPerfilState extends State<_FolhaEditarPerfil> {
           controller: _objetivo,
           style: TextStyle(color: p.texto),
           textCapitalization: TextCapitalization.sentences,
-          decoration: _campo(p, 'Ex.: correr 10 km em 50 min', Icons.flag_outlined),
+          decoration:
+              _campo(p, 'Ex.: correr 10 km em 50 min', Icons.flag_outlined),
         ),
         if (_erro != null) ...[
           const SizedBox(height: 12),

@@ -13,7 +13,6 @@ import 'screens/perfil.dart';
 import 'screens/configuracoes.dart';
 import 'screens/evolucao.dart';
 import '../services/preferencia.dart';
-import '../services/api_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

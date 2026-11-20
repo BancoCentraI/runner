@@ -56,8 +56,7 @@ class _Paleta {
   Color get heroiTexto => escuro ? Colors.white : _tinta;
 
   /// Nível e textos menores no topo.
-  Color get heroiTextoSec =>
-      escuro ? _textoClaro : const Color(0xFF4A5A12);
+  Color get heroiTextoSec => escuro ? _textoClaro : const Color(0xFF4A5A12);
 
   /// "SUA CONTA", anéis e rota desenhados no fundo.
   Color get heroiLinha => escuro ? _destaque : _tinta;
@@ -254,7 +253,8 @@ class _PerfilApi {
   static Future<PerfilData> buscar() async {
     final r = await ApiOffline.buscar('/perfil', cache: 'perfil');
     final corpo = r.mapa;
-    final dados = corpo != null ? PerfilData.fromJson(corpo) : const PerfilData();
+    final dados =
+        corpo != null ? PerfilData.fromJson(corpo) : const PerfilData();
     return _somarPendentes(dados);
   }
 
@@ -447,7 +447,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                           const SizedBox(height: 24),
                           Center(
                             child: Text(
-                              'Runner · feito para quem corre',
+                              'Runner · feito para quem treina',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: p.textoSecundario,
@@ -759,6 +759,14 @@ class _Topo extends StatelessWidget {
               child: Row(
                 children: [
                   _Numero(
+                    icone: Icons.directions_run_rounded,
+                    valor: treinos.toDouble(),
+                    rotulo: treinos == 1 ? 'Treino' : 'Treinos',
+                    destaque: true,
+                    formatar: (v) => '${v.round()}',
+                  ),
+                  const _Divisor(),
+                  _Numero(
                     icone: Icons.calendar_month_outlined,
                     valor: semanas.toDouble(),
                     rotulo: semanas == 1 ? 'Semana' : 'Semanas',
@@ -766,17 +774,9 @@ class _Topo extends StatelessWidget {
                   ),
                   const _Divisor(),
                   _Numero(
-                    icone: Icons.directions_run_rounded,
-                    valor: treinos.toDouble(),
-                    rotulo: treinos == 1 ? 'Treino' : 'Treinos',
-                    formatar: (v) => '${v.round()}',
-                  ),
-                  const _Divisor(),
-                  _Numero(
                     icone: Icons.route_rounded,
                     valor: kmTotal,
-                    rotulo: 'km total',
-                    destaque: true,
+                    rotulo: 'km corridos',
                     formatar: (v) => _formatarKm(
                         kmTotal == kmTotal.truncateToDouble()
                             ? v.roundToDouble()
@@ -1191,7 +1191,7 @@ class _AnelPainter extends CustomPainter {
 }
 
 // =============================================================================
-// MÉDIAS (calculadas a partir de semanas, treinos e km da API)
+// MÉDIAS (constância em destaque; km só aparece se houver corrida)
 // =============================================================================
 
 class _SecaoMedias extends StatelessWidget {
@@ -1216,7 +1216,7 @@ class _SecaoMedias extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _TituloSecao(sobre: 'SEU RITMO', titulo: 'Suas médias'),
+        const _TituloSecao(sobre: 'SUA CONSTÂNCIA', titulo: 'Suas médias'),
         const SizedBox(height: 12),
         IntrinsicHeight(
           child: Row(
@@ -1224,22 +1224,24 @@ class _SecaoMedias extends StatelessWidget {
             children: [
               Expanded(
                 child: _TileNumero(
-                  icone: Icons.straighten_rounded,
-                  valor: _umaCasa(kmPorTreino),
-                  unidade: 'km',
-                  rotulo: 'por treino',
-                  destacado: true,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _TileNumero(
                   icone: Icons.event_repeat_rounded,
                   valor: _umaCasa(treinosPorSemana),
                   unidade: treinosPorSemana == 1 ? 'treino' : 'treinos',
                   rotulo: 'por semana',
+                  destacado: true,
                 ),
               ),
+              if (kmTotal > 0) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _TileNumero(
+                    icone: Icons.straighten_rounded,
+                    valor: _umaCasa(kmPorTreino),
+                    unidade: 'km',
+                    rotulo: 'por treino',
+                  ),
+                ),
+              ],
             ],
           ),
         ),
